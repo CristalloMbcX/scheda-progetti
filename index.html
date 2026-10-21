@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16191d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scheda">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Scheda Palestra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky header with day tabs, one column of exercise cards, fixed rest-timer bar at the bottom */
+:root {
+  --bg: #eceef1;
+  --surface: #ffffff;
+  --surface-2: #f4f5f7;
+  --ink: #16191d;
+  --muted: #5d6570;
+  --line: #d7dbe0;
+  --accent: #2448d8;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3e9ff;
+  --done: #1d7a46;
+  --done-soft: #dcf1e4;
+  --warn: #9a5b00;
+  --warn-soft: #fbedd6;
+  --danger: #b3261e;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111317; --surface: #1b1e23; --surface-2: #23272d; --ink: #eef0f3; --muted: #9aa2ad;
+    --line: #2f343b; --accent: #7d97ff; --accent-ink: #0d1020; --accent-soft: #232b4a;
+    --done: #5fd08f; --done-soft: #183224; --warn: #f2b45a; --warn-soft: #3a2c15; --danger: #ff8a80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111317; --surface: #1b1e23; --surface-2: #23272d; --ink: #eef0f3; --muted: #9aa2ad;
+  --line: #2f343b; --accent: #7d97ff; --accent-ink: #0d1020; --accent-soft: #232b4a;
+  --done: #5fd08f; --done-soft: #183224; --warn: #f2b45a; --warn-soft: #3a2c15; --danger: #ff8a80;
+  color-scheme: dark;
+}
+html { -webkit-text-size-adjust: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.4; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+header.top .wrap { padding-block: 10px 10px; display: grid; gap: 8px; }
+.brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.brand h1 { margin: 0; font-family: var(--display); font-size: 1.6rem; letter-spacing: .02em; text-transform: uppercase; }
+.brand .sync { font-size: .78rem; color: var(--muted); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tabs button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 4px; font-family: var(--display); font-size: 1.05rem; letter-spacing: .04em; text-transform: uppercase; position: relative; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tabs button .dot { position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+main .wrap { padding-block: 14px 140px; display: grid; gap: 12px; }
+.dayhead { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; }
+.dayhead h2 { margin: 0; font-family: var(--display); font-size: 2.1rem; line-height: 1; text-transform: uppercase; }
+.dayhead p { margin: 0; color: var(--muted); font-size: .9rem; }
+.section-label { font-family: var(--display); text-transform: uppercase; letter-spacing: .08em; font-size: .95rem; color: var(--muted); margin-top: 6px; }
+
+.ex { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 8px; }
+.ex.complete { border-color: var(--done); }
+.ss { border: 2px dashed var(--accent); border-radius: 16px; padding: 8px; display: grid; gap: 8px; }
+.ss > .ss-label { font-family: var(--display); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-size: .95rem; padding: 0 4px; display: flex; justify-content: space-between; gap: 8px; }
+.ss > .ss-label span:last-child { color: var(--muted); letter-spacing: .02em; text-transform: none; font-family: var(--body); font-size: .82rem; }
+.ex-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ex-h h3 { margin: 0; font-size: 1.08rem; font-weight: 600; min-width: 0; flex: 1; }
+.edit { flex: none; width: 34px; height: 34px; margin: -6px -6px -6px 0; border: 0; background: transparent; border-radius: 8px; display: grid; place-items: center; }
+.edit svg { width: 18px; height: 18px; stroke: var(--muted); }
+.editor { display: grid; gap: 8px; background: var(--surface-2); border-radius: 10px; padding: 10px; }
+.editor label { display: grid; gap: 4px; font-size: .82rem; color: var(--muted); }
+.editor input, .editor select { height: 42px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 0 10px; font-size: 1rem; color: var(--ink); }
+.ed-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.small { height: 40px; font-size: 1rem; padding: 0 16px; flex: 1; }
+.chip.rep { background: var(--accent-soft); color: var(--accent); }
+.tgt { font-family: var(--display); font-size: 1.05rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.last { margin: 0; font-size: .86rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; font-size: .75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.chip.up { background: var(--warn-soft); color: var(--warn); }
+.alt { display: flex; gap: 6px; }
+.alt button { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 4px 12px; font-size: .85rem; }
+.alt button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+.sets { display: grid; gap: 6px; }
+.set { display: grid; grid-template-columns: 24px 1fr 1fr 52px; gap: 8px; align-items: center; }
+.set .n { font-family: var(--display); font-size: 1.15rem; color: var(--muted); text-align: center; }
+.field { position: relative; }
+.field input { width: 100%; box-sizing: border-box; height: 48px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); padding: 0 34px 0 12px; font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.field input::placeholder { color: var(--muted); opacity: .7; font-weight: 500; }
+.field span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: .78rem; color: var(--muted); pointer-events: none; }
+.tick { height: 48px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+.tick svg { width: 22px; height: 22px; stroke: var(--muted); }
+.set.done .tick { background: var(--done); border-color: var(--done); }
+.set.done .tick svg { stroke: var(--surface); }
+.set.done .field input { background: var(--done-soft); border-color: transparent; }
+.set.one { grid-template-columns: 24px 1fr 52px; }
+
+.finish { display: grid; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.finish label { font-size: .85rem; color: var(--muted); }
+.finish textarea { width: 100%; box-sizing: border-box; min-height: 64px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); padding: 10px; resize: vertical; }
+.btn { height: 50px; border-radius: 12px; border: 0; background: var(--accent); color: var(--accent-ink); font-family: var(--display); font-size: 1.25rem; letter-spacing: .05em; text-transform: uppercase; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); font-size: 1rem; height: 42px; }
+.btn.danger { color: var(--danger); border-color: var(--danger); }
+.msg { margin: 0; font-size: .9rem; color: var(--done); font-weight: 600; }
+
+.hist { display: grid; gap: 10px; }
+.hcard { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.hcard summary { list-style: none; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; }
+.hcard summary::-webkit-details-marker { display: none; }
+.hcard summary b { font-family: var(--display); font-size: 1.3rem; text-transform: uppercase; font-weight: 700; }
+.hcard summary small { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.hbody { padding: 0 12px 12px; display: grid; gap: 6px; }
+.hrow { display: flex; justify-content: space-between; gap: 12px; font-size: .92rem; border-top: 1px solid var(--line); padding-top: 6px; }
+.hrow span:first-child { min-width: 0; }
+.hrow span:last-child { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.hnote { font-size: .9rem; color: var(--muted); font-style: italic; margin: 4px 0; }
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 20px; color: var(--muted); text-align: center; }
+
+.timer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--ink); color: var(--bg); padding-bottom: env(safe-area-inset-bottom, 0px); transform: translateY(110%); transition: transform .2s ease; }
+.timer.on { transform: none; }
+.timer .wrap { padding-block: 10px 12px; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+.timer .clock { font-family: var(--display); font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.timer .lbl { font-size: .82rem; opacity: .75; grid-column: 1; }
+.timer .ctrls { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 6px; }
+.timer .ctrls button { height: 44px; min-width: 52px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--bg) 35%, transparent); background: transparent; color: var(--bg); font-weight: 600; }
+.timer .bar { grid-column: 1 / -1; height: 4px; background: color-mix(in srgb, var(--bg) 20%, transparent); border-radius: 4px; overflow: hidden; }
+.timer .bar i { display: block; height: 100%; background: var(--accent); width: 100%; }
+.timer.go .clock { color: var(--done); }
+@media (prefers-reduced-motion: reduce) { .timer { transition: none; } }
+</style>
+
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><h1>Scheda Palestra</h1><span class="sync" id="sync">Salvataggio sul telefono</span></div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+  </div>
+</header>
+<main><div class="wrap" id="view"></div></main>
+<div class="timer" id="timer" aria-live="polite">
+  <div class="wrap">
+    <div class="clock" id="clock">0:00</div>
+    <div class="ctrls">
+      <button id="tMinus" aria-label="Togli 15 secondi">−15</button>
+      <button id="tPlus" aria-label="Aggiungi 15 secondi">+15</button>
+      <button id="tSkip">Salta</button>
+    </div>
+    <div class="lbl" id="tLabel">Recupero</div>
+    <div class="bar"><i id="tBar"></i></div>
+  </div>
+</div>
+
+<script>
+// ---------- Plan ----------
+const E = (id, name, w, reps, sets, rest, extra = {}) => ({ id, name, w, reps, sets, rest, fields: ["kg", "reps"], ...extra });
+const FINALE = [
+  E("fin-crunch-cavi", "Crunch ai cavi", 35, "", 3, 60),
+  E("fin-crunch-alti", "Crunch alti con tappetino", null, "10", 3, 60, { fields: ["reps"] }),
+  E("fin-cardio", "Cardio", null, "", 1, 0, { fields: ["min", "lvl"], defaults: { min: 15, lvl: 6 } })
+];
+const PLAN = {
+  lun: { name: "Lunedì", blocks: [
+    E("lun-panca-multi", "Panca inclinata multipower 30°", 17.5, "6/8/10", 3, 150),
+    E("lun-pectfly", "Pect fly / Chest press", 45, "9", 2, 90, { key: "pectfly" }),
+    E("lun-lat-prona", "Lat machine presa prona", 50, "8", 2, 120),
+    E("lun-pulley", "Pulley con triangolo", 55, "8/7", 2, 120),
+    E("lun-alzate", "Alzate laterali al cavo", 10, "10", 2, 120),
+    { superset: true, label: "Superserie", items: [
+      E("lun-cavi-tri", "Cavi tricipiti", 45, "8", 2, 120),
+      E("lun-cavi-bi", "Cavi bicipiti", 45, "9", 2, 120)
+    ]},
+    E("lun-leg-ext", "Leg extension", 50, "9", 2, 120),
+    E("lun-leg-curl", "Leg curl", 37, "8", 3, 120, { key: "legcurl" })
+  ]},
+  mer: { name: "Mercoledì", blocks: [
+    E("mer-lat-larga", "Lat machine presa larga", 50, "8", 3, 120),
+    E("mer-straight-row", "Straight row", 25, "8", 2, 90),
+    E("mer-panca-piana", "Panca piana", 24, "8", 2, 120),
+    E("mer-pectfly", "Pect fly", 45, "8", 2, 90, { key: "pectfly" }),
+    E("mer-pick-back", "Pick back", 40, "7", 2, 120),
+    E("mer-scott", "Panca Scott", 14, "8", 2, 120),
+    E("mer-distensioni", "Distensioni", 35, "10", 2, 120),
+    E("mer-leg-press", "Leg press", 70, "10", 3, 120, { alt: { name: "V-Squat", w: 45, key: "vsquat" } })
+  ]},
+  ven: { name: "Venerdì", blocks: [
+    E("ven-curl-grigio", "Curl (grigio)", 11.25, "8/7", 2, 150),
+    E("ven-curl-bianco", "Curl (bianco)", 12.5, "8/6", 2, 150),
+    E("ven-french", "French press", 10, "10", 2, 120),
+    { superset: true, label: "Superserie", note: "da aumentare", items: [
+      E("ven-hammer", "Hammer curl", 16, "9", 2, 120),
+      E("ven-pushdown", "Push down", 27, "8", 2, 120)
+    ]},
+    E("ven-panca-incl", "Panca inclinata 30°", 22, "8/6", 2, 150),
+    E("ven-lat-inversa", "Lat machine presa inversa", 45, "8/6", 2, 120),
+    E("ven-lento", "Lento con manubri", 14, "10", 2, 120),
+    E("ven-stacchi", "Stacchi", 16, "10", 2, 150),
+    E("ven-leg-curl", "Leg curl", 30, "10", 2, 120, { key: "legcurl" })
+  ]}
+};
+const DAYS = ["lun", "mer", "ven"];
+const UNITS = { kg: "kg", reps: "rip", min: "min", lvl: "lvl" };
+const allEx = day => PLAN[day].blocks.flatMap(b => b.superset ? b.items : [b]).concat(FINALE);
+const exById = (day, id) => allEx(day).find(e => e.id === id);
+const ALL = [...new Map(DAYS.flatMap(allEx).map(e => [e.id, e])).values()];
+// Same key = same exercise on different days: they share last weight and progression.
+const keyOf = (id, alt) => { const ex = ALL.find(e => e.id === id); if (!ex) return id; return alt && ex.alt ? ex.alt.key : (ex.key || ex.id); };
+const MAX_REPS = 10;
+// Progression: under 10 reps add one rep; at 10 reps add 1 kg and restart from 6 reps.
+function suggest(ex, prev, target) {
+  if (ex.fields[0] === "min") return { min: prev && prev.min != null ? prev.min : ex.defaults.min, lvl: prev && prev.lvl != null ? prev.lvl : ex.defaults.lvl };
+  const kg = prev && prev.kg != null ? prev.kg : ex.w;
+  const r = prev ? prev.reps : null;
+  if (r == null) return { kg, reps: target, step: null };
+  if (r < MAX_REPS) return { kg, reps: r + 1, step: "rep" };
+  if (ex.fields.includes("kg") && kg != null) return { kg: kg + 1, reps: 6, step: "kg" };
+  return { kg, reps: r, step: null };
+}
+const REST_OPTS = Array.from({ length: 20 }, (_, i) => (i + 1) * 15).filter(s => s >= 30);
+
+// ---------- Helpers ----------
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = v => { if (v === "" || v == null) return null; const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? null : n; };
+const fmt = n => n == null ? "" : String(Math.round(n * 100) / 100).replace(".", ",");
+const fmtRest = s => s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "";
+const targets = ex => { const p = ex.reps ? ex.reps.split("/").map(Number) : []; return Array.from({ length: ex.sets }, (_, i) => p.length ? p[Math.min(i, p.length - 1)] : null); };
+const dShort = ts => new Date(ts).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+// ---------- State ----------
+const S = {
+  view: null,
+  sessions: lsGet("sp.sessions") || [],
+  drafts: lsGet("sp.drafts") || {},
+  cfg: lsGet("sp.cfg") || {},
+  editing: null,
+  saved: null,
+  confirmDel: null
+};
+function defaultDay() {
+  const open = DAYS.find(d => S.drafts[d] && hasDone(S.drafts[d]));
+  if (open) return open;
+  return ({ 0: "lun", 1: "lun", 2: "mer", 3: "mer", 4: "ven", 5: "ven", 6: "lun" })[new Date().getDay()];
+}
+const hasDone = dr => Object.values(dr.entries || {}).some(e => e.sets.some(s => s.done));
+const sortedSessions = () => [...S.sessions].sort((a, b) => b.end - a.end);
+function lastEntry(exId, alt) {
+  const key = keyOf(exId, alt);
+  for (const s of sortedSessions()) {
+    for (const [id, e] of Object.entries(s.entries)) if (keyOf(id, e.alt) === key && e.sets.length) return { e, end: s.end };
+  }
+  return null;
+}
+function draft(day) {
+  if (!S.drafts[day]) S.drafts[day] = { day, start: null, entries: {}, note: "" };
+  return S.drafts[day];
+}
+function entry(day, ex) {
+  const d = draft(day);
+  if (!d.entries[ex.id]) d.entries[ex.id] = { alt: false, sets: Array.from({ length: ex.sets }, () => ({})) };
+  return d.entries[ex.id];
+}
+const cfgId = (ex, alt) => alt && ex.alt ? ex.id + "~alt" : ex.id;
+function cur(ex, alt) {
+  const base = alt && ex.alt ? { ...ex, name: ex.alt.name, w: ex.alt.w } : { ...ex };
+  const c = S.cfg[cfgId(ex, alt)];
+  if (c) { if (c.name) base.name = c.name; if (c.rest != null) base.rest = c.rest; }
+  return base;
+}
+
+// ---------- Storage (account db, falling back to this phone) ----------
+const store = {
+  db: null, uid: null, ready: false,
+  col() { return this.db.collection("data/users/" + this.uid); },
+  async init() {
+    if (STANDALONE) return;
+    let c = window.claude, tries = 0;
+    while (!(c && c.use) && tries++ < 20) { await new Promise(r => setTimeout(r, 150)); c = window.claude; }
+    if (!(c && c.use)) return;
+    try {
+      const [db, user] = await Promise.all([c.use("db"), c.use("user")]);
+      if (!db || !user) return;
+      const id = await user.id();
+      if (!id) return;
+      this.db = db; this.uid = id;
+      let first = true;
+      this.col().onSnapshot(snap => {
+        const sessions = [], drafts = {}; let cfg = null;
+        snap.docs.forEach(d => {
+          const v = d.data(); if (!v) return;
+          if (d.id.startsWith("s_")) sessions.push({ ...v, id: d.id });
+          else if (d.id.startsWith("cur_")) drafts[d.id.slice(4)] = JSON.parse(JSON.stringify(v));
+          else if (d.id === "cfg") cfg = JSON.parse(JSON.stringify(v.ex || {}));
+        });
+        if (first) {
+          first = false;
+          this.ready = true;
+          setSync();
+          // Move anything saved only on this phone up to the account.
+          const known = new Set(sessions.map(s => s.id));
+          S.sessions.filter(s => !known.has(s.id)).forEach(s => { this.saveSession(s); sessions.push(s); });
+          if (!cfg && Object.keys(S.cfg).length) this.saveCfg();
+          for (const d of DAYS) {
+            if (drafts[d] && !(S.drafts[d] && hasDone(S.drafts[d]))) S.drafts[d] = drafts[d];
+            else if (S.drafts[d] && hasDone(S.drafts[d]) && !drafts[d]) this.saveDraft(d);
+          }
+        }
+        S.sessions = sessions;
+        if (cfg) S.cfg = cfg;
+        lsSet("sp.sessions", S.sessions); lsSet("sp.drafts", S.drafts); lsSet("sp.cfg", S.cfg);
+        softRender();
+      }, () => { this.db = null; setSync(); });
+    } catch (e) { this.db = null; }
+    setSync();
+  },
+  saveDraft(day) {
+    lsSet("sp.drafts", S.drafts);
+    if (!this.ready) return;
+    const d = S.drafts[day];
+    (d ? this.col().doc("cur_" + day).set(JSON.parse(JSON.stringify(d))) : this.col().doc("cur_" + day).delete()).catch(() => {});
+  },
+  saveSession(s) {
+    lsSet("sp.sessions", S.sessions);
+    if (this.ready) { const { id, ...body } = s; this.col().doc(id).set(body).catch(() => {}); }
+  },
+  saveCfg() {
+    lsSet("sp.cfg", S.cfg);
+    if (this.ready) this.col().doc("cfg").set({ ex: JSON.parse(JSON.stringify(S.cfg)) }).catch(() => {});
+  },
+  deleteSession(id) {
+    lsSet("sp.sessions", S.sessions);
+    if (this.ready) this.col().doc(id).delete().catch(() => {});
+  }
+};
+function setSync() {
+  document.getElementById("sync").textContent = store.ready ? "Salvato sul tuo account" : "Salvato sul telefono";
+}
+const timers = {};
+function queueSave(day) { clearTimeout(timers[day]); lsSet("sp.drafts", S.drafts); timers[day] = setTimeout(() => store.saveDraft(day), 700); }
+
+// ---------- Render ----------
+const tabsEl = document.getElementById("tabs"), viewEl = document.getElementById("view");
+function renderTabs() {
+  const items = DAYS.map(d => [d, PLAN[d].name.slice(0, 3)]).concat([["hist", "Storico"]]);
+  tabsEl.innerHTML = items.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${S.view === k}">${l}${S.drafts[k] && hasDone(S.drafts[k]) ? '<span class="dot" title="Allenamento in corso"></span>' : ""}</button>`).join("");
+}
+function render() {
+  renderTabs();
+  viewEl.innerHTML = S.view === "hist" ? renderHist() : renderDay(S.view);
+}
+let pending = false;
+function softRender() {
+  const a = document.activeElement;
+  if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) { pending = true; return; }
+  const y = window.scrollY; render(); window.scrollTo(0, y);
+}
+document.addEventListener("focusout", () => setTimeout(() => { if (pending) { pending = false; softRender(); } }, 50));
+
+function renderDay(day) {
+  const p = PLAN[day], d = S.drafts[day];
+  const n = allEx(day).length;
+  let h = `<div class="dayhead"><div><h2>${p.name}</h2><p>${n} esercizi${d && d.start ? " · iniziato alle " + new Date(d.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : ""}</p></div></div>`;
+  for (const b of p.blocks) {
+    if (b.superset) {
+      h += `<div class="ss"><div class="ss-label"><span>${b.label}</span><span>${b.note ? esc(b.note) + " · " : ""}recupero dopo il secondo</span></div>${b.items.map((ex, i) => card(day, ex, i < b.items.length - 1)).join("")}</div>`;
+    } else h += card(day, b, false);
+  }
+  h += `<div class="section-label">Esercizi finali</div>` + FINALE.map(ex => card(day, ex, false)).join("");
+  const canSave = d && hasDone(d);
+  h += `<div class="finish"><label for="note-${day}">Note sulla seduta</label><textarea id="note-${day}" data-note="${day}" placeholder="Come è andata, cosa aumentare la prossima volta">${esc(d ? d.note : "")}</textarea>
+    ${S.saved === day ? `<p class="msg">Allenamento salvato nello storico.</p>` : ""}
+    <button class="btn" data-finish="${day}" ${canSave ? "" : "disabled"}>Salva allenamento</button>
+    ${canSave ? `<button class="btn ghost" data-discard="${day}">${S.confirmDel === "draft-" + day ? "Tocca di nuovo per azzerare" : "Azzera seduta"}</button>` : ""}</div>`;
+  return h;
+}
+function card(day, ex0, inSuperset) {
+  const d = S.drafts[day], en = d && d.entries[ex0.id];
+  const alt = !!(en && en.alt), ex = cur(ex0, alt);
+  const tg = targets(ex), last = lastEntry(ex0.id, alt);
+  const doneAll = en && en.sets.every(s => s.done);
+  const editing = S.editing === day + ":" + ex0.id;
+  const tgt = ex.fields[0] === "min" ? `${ex.defaults.min} min · lvl ${ex.defaults.lvl}` : `${ex.sets} × ${ex.reps || "—"}${ex.rest ? " · " + fmtRest(ex.rest) : ""}`;
+  let h = `<article class="ex${doneAll ? " complete" : ""}" data-ex="${ex0.id}"><div class="ex-h"><h3>${esc(ex.name)}</h3><span class="tgt">${tgt}</span><button class="edit" data-edit aria-label="Modifica ${esc(ex.name)}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button></div>`;
+  if (editing) {
+    const restOpts = ex.fields[0] === "min" ? "" : `<label>Recupero<select id="rest-${day}-${ex0.id}" data-cfg-rest>${REST_OPTS.map(o => `<option value="${o}"${o === ex.rest ? " selected" : ""}>${fmtRest(o)}</option>`).join("")}${REST_OPTS.includes(ex.rest) ? "" : `<option value="${ex.rest}" selected>${fmtRest(ex.rest)}</option>`}</select></label>`;
+    h += `<div class="editor"><label>Nome<input id="name-${day}-${ex0.id}" data-cfg-name value="${esc(ex.name)}" autocomplete="off"></label>${restOpts}
+      <div class="ed-btns"><button class="btn small" data-cfg-save>Salva</button><button class="btn ghost small" data-cfg-cancel>Annulla</button>${S.cfg[cfgId(ex0, alt)] ? `<button class="btn ghost small" data-cfg-reset>Originale</button>` : ""}</div></div>`;
+  }
+  if (ex0.alt) h += `<div class="alt"><button data-alt="0" aria-pressed="${!alt}">${esc(cur(ex0, false).name)}</button><button data-alt="1" aria-pressed="${alt}">${esc(cur(ex0, true).name)}</button></div>`;
+  const prevOf = i => last && (last.e.sets[i] || last.e.sets[last.e.sets.length - 1]);
+  const sug = Array.from({ length: ex.sets }, (_, i) => suggest(ex, prevOf(i), tg[i]));
+  if (last) {
+    const show = x => ex.fields.map(f => fmt(x[f]) + (f === "min" ? " min" : f === "lvl" ? " lvl" : "")).join(f2(ex));
+    const steps = sug.map(x => x.step).filter(Boolean);
+    const chip = steps.includes("kg") ? '<span class="chip up">+1 kg</span>' : steps.includes("rep") ? '<span class="chip rep">+1 rip</span>' : "";
+    h += `<p class="last"><span>Ultima (${dShort(last.end)}): ${last.e.sets.map(show).join(" · ")}</span>${chip}</p>`;
+  }
+  h += `<div class="sets">`;
+  for (let i = 0; i < ex.sets; i++) {
+    const s = (en && en.sets[i]) || {};
+    h += `<div class="set${s.done ? " done" : ""}${ex.fields.length === 1 ? " one" : ""}" data-i="${i}"><span class="n">${ex.sets > 1 ? i + 1 : ""}</span>`;
+    for (const f of ex.fields) {
+      const val = s[f] != null && s[f] !== "" ? s[f] : fmt(sug[i][f]);
+      const ph = f === "reps" && tg[i] != null ? tg[i] : "";
+      h += `<label class="field"><input id="${day}-${ex0.id}-${i}-${f}" data-f="${f}" inputmode="decimal" autocomplete="off" value="${esc(val)}" placeholder="${esc(ph)}" aria-label="${UNITS[f]} serie ${i + 1}"><span>${UNITS[f]}</span></label>`;
+    }
+    h += `<button class="tick" data-tick data-ss="${inSuperset ? 1 : 0}" aria-label="Serie ${i + 1} fatta" aria-pressed="${!!s.done}"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`;
+  }
+  return h + `</div></article>`;
+}
+const f2 = ex => ex.fields[0] === "kg" ? " × " : " / ";
+
+function renderHist() {
+  const list = sortedSessions();
+  if (!list.length) return `<div class="dayhead"><div><h2>Storico</h2></div></div><div class="empty">Nessun allenamento salvato. Quando premi “Salva allenamento” a fine seduta, la trovi qui con pesi e ripetizioni di ogni serie.</div>` + backupBox();
+  let h = `<div class="dayhead"><div><h2>Storico</h2><p>${list.length} allenament${list.length === 1 ? "o" : "i"}</p></div></div><div class="hist">`;
+  for (const s of list) {
+    const mins = s.start ? Math.round((s.end - s.start) / 60000) : null;
+    const nSets = Object.values(s.entries).reduce((a, e) => a + e.sets.length, 0);
+    h += `<details class="hcard"><summary><b>${esc(PLAN[s.day] ? PLAN[s.day].name : s.day)}</b><small>${dShort(s.end)}${mins ? " · " + mins + " min" : ""} · ${nSets} serie</small></summary><div class="hbody">`;
+    if (s.note) h += `<p class="hnote">${esc(s.note)}</p>`;
+    for (const [id, e] of Object.entries(s.entries)) {
+      const ex = exById(s.day, id) || { fields: e.fields || ["kg", "reps"] };
+      const fields = e.fields || ex.fields;
+      h += `<div class="hrow"><span>${esc(e.name)}</span><span>${e.sets.map(x => fields.map(f => fmt(x[f]) + (f === "min" ? " min" : f === "lvl" ? " lvl" : "")).join(fields[0] === "kg" ? " × " : " / ")).join(" · ")}</span></div>`;
+    }
+    h += `<button class="btn ghost danger" data-del="${s.id}">${S.confirmDel === s.id ? "Tocca di nuovo per eliminare" : "Elimina allenamento"}</button></div></details>`;
+  }
+  return h + `</div>` + backupBox();
+}
+const STANDALONE = true;
+function backupBox() {
+  return `<div class="finish"><div class="section-label" style="margin:0">Backup</div>
+    <label for="imp">Copia il backup per spostare storico e modifiche su un altro telefono o nell'altra versione dell'app. Per ripristinare, incollalo qui sotto.</label>
+    <div class="ed-btns"><button class="btn small" data-backup-copy>Copia backup</button>${STANDALONE ? '<button class="btn ghost small" data-backup-file>Scarica file</button>' : ""}</div>
+    <textarea id="imp" placeholder="Incolla qui un backup"></textarea>
+    <button class="btn ghost" data-backup-import>Importa backup</button>
+    ${S.backupMsg ? `<p class="msg">${esc(S.backupMsg)}</p>` : ""}</div>`;
+}
+const backupText = () => JSON.stringify({ app: "scheda-palestra", v: 1, sessions: S.sessions, cfg: S.cfg });
+function importBackup(txt) {
+  let d; try { d = JSON.parse(txt); } catch (e) { return "Il testo incollato non è un backup valido."; }
+  if (!d || !Array.isArray(d.sessions)) return "Il testo incollato non è un backup valido.";
+  const known = new Set(S.sessions.map(s => s.id)); let n = 0;
+  for (const s of d.sessions) if (s && s.id && s.entries && !known.has(s.id)) { S.sessions.push(s); store.saveSession(s); n++; }
+  if (d.cfg && typeof d.cfg === "object") { S.cfg = { ...d.cfg, ...S.cfg }; store.saveCfg(); }
+  return `Importati ${n} allenament${n === 1 ? "o" : "i"}.`;
+}
+
+// ---------- Interactions ----------
+tabsEl.addEventListener("click", e => {
+  const b = e.target.closest("[data-tab]"); if (!b) return;
+  S.view = b.dataset.tab; S.saved = null; S.confirmDel = null; S.backupMsg = null;
+  try { sessionStorage.setItem("sp.tab", S.view); } catch (err) {}
+  render(); window.scrollTo(0, 0);
+});
+viewEl.addEventListener("input", e => {
+  const t = e.target, day = S.view;
+  if (t.dataset.note) { draft(day).note = t.value; queueSave(day); return; }
+  const f = t.dataset.f; if (!f) return;
+  const art = t.closest("[data-ex]"), i = +t.closest("[data-i]").dataset.i;
+  const ex = exById(day, art.dataset.ex), en = entry(day, ex);
+  en.sets[i][f] = t.value;
+  queueSave(day);
+});
+viewEl.addEventListener("click", e => {
+  const day = S.view;
+  const tick = e.target.closest("[data-tick]");
+  if (tick) return onTick(day, tick);
+  const altB = e.target.closest("[data-alt]");
+  if (altB) { const ex = exById(day, altB.closest("[data-ex]").dataset.ex); const en = entry(day, ex); en.alt = altB.dataset.alt === "1"; en.sets = en.sets.map(() => ({})); queueSave(day); return softRender(); }
+  if (e.target.closest("[data-edit]")) { const id = e.target.closest("[data-ex]").dataset.ex; S.editing = S.editing === day + ":" + id ? null : day + ":" + id; return softRender(); }
+  if (e.target.closest("[data-cfg-cancel]")) { S.editing = null; return softRender(); }
+  const cfgSave = e.target.closest("[data-cfg-save]"), cfgReset = e.target.closest("[data-cfg-reset]");
+  if (cfgSave || cfgReset) {
+    const art = e.target.closest("[data-ex]"), ex0 = exById(day, art.dataset.ex);
+    const en = S.drafts[day] && S.drafts[day].entries[ex0.id], alt = !!(en && en.alt), k = cfgId(ex0, alt);
+    if (cfgReset) delete S.cfg[k];
+    else {
+      const orig = alt && ex0.alt ? { name: ex0.alt.name, rest: ex0.rest } : ex0;
+      const name = art.querySelector("[data-cfg-name]").value.trim();
+      const rs = art.querySelector("[data-cfg-rest]");
+      const c = {};
+      if (name && name !== orig.name) c.name = name;
+      if (rs && +rs.value !== orig.rest) c.rest = +rs.value;
+      if (Object.keys(c).length) S.cfg[k] = c; else delete S.cfg[k];
+    }
+    S.editing = null; store.saveCfg(); pending = false; document.activeElement && document.activeElement.blur(); return softRender();
+  }
+  const fin = e.target.closest("[data-finish]");
+  if (fin) return finish(day);
+  const dis = e.target.closest("[data-discard]");
+  if (dis) {
+    if (S.confirmDel !== "draft-" + day) { S.confirmDel = "draft-" + day; return softRender(); }
+    delete S.drafts[day]; S.confirmDel = null; store.saveDraft(day); stopTimer(); return softRender();
+  }
+  if (e.target.closest("[data-backup-copy]")) {
+    const t = backupText(), box = viewEl.querySelector("#imp");
+    const fallback = () => { box.value = t; box.focus(); box.select(); S.backupMsg = null; };
+    try { navigator.clipboard.writeText(t).then(() => { S.backupMsg = "Backup copiato. Incollalo nell'altra app, in Storico > Importa backup."; softRender(); }, fallback); } catch (err) { fallback(); }
+    return;
+  }
+  if (e.target.closest("[data-backup-file]")) {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([backupText()], { type: "application/json" }));
+    a.download = "scheda-palestra-backup-" + new Date().toISOString().slice(0, 10) + ".json"; document.body.appendChild(a); a.click(); a.remove(); return;
+  }
+  if (e.target.closest("[data-backup-import]")) { const box = viewEl.querySelector("#imp"); S.backupMsg = importBackup(box.value); box.value = ""; pending = false; box.blur(); return softRender(); }
+  const del = e.target.closest("[data-del]");
+  if (del) {
+    const id = del.dataset.del;
+    if (S.confirmDel !== id) { S.confirmDel = id; const open = del.closest("details"); softRender(); const again = viewEl.querySelector(`[data-del="${id}"]`); if (again) again.closest("details").open = true; return; }
+    S.sessions = S.sessions.filter(s => s.id !== id); S.confirmDel = null; store.deleteSession(id); softRender();
+  }
+});
+function onTick(day, btn) {
+  unlockAudio(); keepAwake();
+  const art = btn.closest("[data-ex]"), row = btn.closest("[data-i]"), i = +row.dataset.i;
+  const ex0 = exById(day, art.dataset.ex), en = entry(day, ex0), ex = cur(ex0, en.alt), s = en.sets[i];
+  const d = draft(day);
+  if (s.done) { s.done = false; queueSave(day); return softRender(); }
+  const tg = targets(ex);
+  for (const f of ex.fields) {
+    const inp = row.querySelector(`[data-f="${f}"]`);
+    let v = num(inp.value);
+    if (v == null && f === "reps") v = tg[i];
+    s[f] = v == null ? "" : fmt(v);
+  }
+  s.done = true;
+  if (!d.start) d.start = Date.now();
+  S.saved = null;
+  queueSave(day);
+  if (document.activeElement) document.activeElement.blur();
+  pending = false;
+  softRender();
+  if (btn.dataset.ss !== "1" && ex.rest) startTimer(ex.rest, ex.name);
+}
+function finish(day) {
+  const d = S.drafts[day]; if (!d || !hasDone(d)) return;
+  const entries = {};
+  for (const [id, en] of Object.entries(d.entries)) {
+    const ex0 = exById(day, id); if (!ex0) continue;
+    const ex = cur(ex0, en.alt);
+    const sets = en.sets.filter(s => s.done).map(s => Object.fromEntries(ex.fields.map(f => [f, num(s[f])])));
+    if (sets.length) entries[id] = { name: ex.name, alt: !!en.alt, fields: ex.fields, sets };
+  }
+  const end = Date.now();
+  const s = { id: "s_" + end, day, start: d.start || end, end, note: d.note || "", entries };
+  S.sessions.push(s);
+  store.saveSession(s);
+  delete S.drafts[day];
+  clearTimeout(timers[day]);
+  store.saveDraft(day);
+  S.saved = day;
+  stopTimer();
+  render();
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+// ---------- Rest timer ----------
+const T = { end: 0, total: 0, label: "", iv: null, goUntil: 0 };
+const tEl = document.getElementById("timer"), clockEl = document.getElementById("clock"), barEl = document.getElementById("tBar"), lblEl = document.getElementById("tLabel");
+function startTimer(sec, label) {
+  T.total = sec; T.end = Date.now() + sec * 1000; T.label = label; T.goUntil = 0;
+  tEl.classList.add("on"); tEl.classList.remove("go");
+  clearInterval(T.iv); T.iv = setInterval(tick, 250); tick();
+}
+function stopTimer() { clearInterval(T.iv); T.iv = null; tEl.classList.remove("on", "go"); }
+function tick() {
+  const now = Date.now();
+  if (T.goUntil) { if (now > T.goUntil) stopTimer(); return; }
+  const left = Math.max(0, Math.ceil((T.end - now) / 1000));
+  clockEl.textContent = fmtRest(left) || "0:00";
+  lblEl.textContent = "Recupero · " + T.label;
+  barEl.style.width = (T.total ? Math.max(0, (T.end - now) / (T.total * 1000)) * 100 : 0) + "%";
+  if (left <= 0) {
+    clockEl.textContent = "Vai!"; lblEl.textContent = "Recupero finito · " + T.label;
+    tEl.classList.add("go"); T.goUntil = now + 4000;
+    beep(); try { navigator.vibrate && navigator.vibrate([250, 120, 250]); } catch (e) {}
+  }
+}
+document.getElementById("tPlus").onclick = () => { if (T.goUntil) return; T.end += 15000; T.total += 15; tick(); };
+document.getElementById("tMinus").onclick = () => { if (T.goUntil) return; T.end -= 15000; tick(); };
+document.getElementById("tSkip").onclick = stopTimer;
+let actx = null;
+function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch (e) {} }
+function beep() {
+  if (!actx) return;
+  try {
+    [0, 0.25, 0.5].forEach((t, k) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.value = k === 2 ? 1320 : 880; o.connect(g); g.connect(actx.destination);
+      const st = actx.currentTime + t; g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.4, st + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.18);
+      o.start(st); o.stop(st + 0.2);
+    });
+  } catch (e) {}
+}
+let lock = null;
+async function keepAwake() { try { if (!lock && navigator.wakeLock) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); } } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (T.iv) tick(); if (DAYS.some(d => S.drafts[d] && hasDone(S.drafts[d]))) keepAwake(); } });
+
+// ---------- Boot ----------
+let savedTab = null; try { savedTab = sessionStorage.getItem("sp.tab"); } catch (e) {}
+S.view = savedTab && (DAYS.includes(savedTab) || savedTab === "hist") ? savedTab : defaultDay();
+setSync();
+render();
+store.init();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+</script>
+</body>
+</html>
