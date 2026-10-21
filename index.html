@@ -114,6 +114,9 @@ main .wrap { padding-block: 14px 140px; display: grid; gap: 12px; }
 .set.warm .n { font-size: .95rem; color: var(--warn); }
 .set.warm:not(.done) .field input { border-style: dashed; }
 .warm-toggle { justify-self: start; border: 0; background: transparent; color: var(--accent); font-size: .85rem; font-weight: 600; padding: 4px 0; }
+.notif-ask { display: grid; gap: 8px; background: var(--accent-soft); border-radius: 14px; padding: 12px; }
+.notif-ask p { margin: 0; font-size: .92rem; }
+.notif-ask .btn { justify-self: start; flex: none; }
 .chip.rep { background: var(--accent-soft); color: var(--accent); }
 .tgt { font-family: var(--display); font-size: 1.05rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .last { margin: 0; font-size: .86rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
@@ -550,7 +553,8 @@ document.addEventListener("focusout", () => setTimeout(() => { if (pending) { pe
 function renderDay(day) {
   const p = PLAN[day], d = S.drafts[day];
   const n = allEx(day).length;
-  let h = `<div class="dayhead"><div><h2>${p.name}</h2><p>${n} esercizi${d && d.start ? " · iniziato alle " + new Date(d.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : ""}</p></div></div>`;
+  let h = STANDALONE && "Notification" in window && Notification.permission === "default" ? `<div class="notif-ask"><p>Attiva le notifiche per vedere il recupero nella barra in alto e sapere quando finisce, anche a schermo spento.</p><button class="btn small" data-notif>Attiva notifiche</button></div>` : "";
+  h += `<div class="dayhead"><div><h2>${p.name}</h2><p>${n} esercizi${d && d.start ? " · iniziato alle " + new Date(d.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : ""}</p></div></div>`;
   for (const b of p.blocks) {
     if (b.superset) {
       h += `<div class="ss"><div class="ss-label"><span>${b.label}</span><span>${b.note ? esc(b.note) + " · " : ""}recupero dopo il secondo</span></div>${b.items.map((ex, i) => card(day, ex, i < b.items.length - 1)).join("")}</div>`;
@@ -674,6 +678,7 @@ viewEl.addEventListener("click", e => {
   const altB = e.target.closest("[data-alt]");
   if (altB) { const ex = exById(day, altB.closest("[data-ex]").dataset.ex); const en = entry(day, ex); en.alt = altB.dataset.alt === "1"; en.sets = en.sets.map(() => ({})); queueSave(day); return softRender(); }
   if (e.target.closest("[data-edit]")) { const id = e.target.closest("[data-ex]").dataset.ex; S.editing = S.editing === day + ":" + id ? null : day + ":" + id; return softRender(); }
+  if (e.target.closest("[data-notif]")) { try { Notification.requestPermission().then(() => { softRender(); if (T.iv && !T.goUntil) restToSw(); }); } catch (err) {} return; }
   const infoB = e.target.closest("[data-info]"), pickB = e.target.closest("[data-pick]");
   if (infoB || pickB) { openSheet(infoB ? "info" : "pick", day, e.target.closest("[data-ex]").dataset.ex); return; }
   if (e.target.closest("[data-warm-toggle]")) {
@@ -837,8 +842,13 @@ function startTimer(sec, label) {
   T.total = sec; T.end = Date.now() + sec * 1000; T.label = label; T.goUntil = 0;
   tEl.classList.add("on"); tEl.classList.remove("go");
   clearInterval(T.iv); T.iv = setInterval(tick, 250); tick();
+  restToSw();
 }
-function stopTimer() { clearInterval(T.iv); T.iv = null; tEl.classList.remove("on", "go"); }
+function stopTimer() { clearInterval(T.iv); T.iv = null; tEl.classList.remove("on", "go"); swPost({ type: "rest-cancel" }); }
+// The service worker shows the countdown and the "rest over" notification while the app is in the background.
+function swPost(msg) { try { const c = navigator.serviceWorker && navigator.serviceWorker.controller; if (c) c.postMessage(msg); } catch (e) {} }
+function restToSw() { if (notifOn()) swPost({ type: "rest-start", end: T.end, label: T.label.replace(/ \(dopo il riscaldamento\)$/, "") }); }
+const notifOn = () => STANDALONE && "Notification" in window && Notification.permission === "granted";
 function tick() {
   const now = Date.now();
   if (T.goUntil) { if (now > T.goUntil) stopTimer(); return; }
@@ -852,8 +862,8 @@ function tick() {
     beep(); try { navigator.vibrate && navigator.vibrate([250, 120, 250]); } catch (e) {}
   }
 }
-document.getElementById("tPlus").onclick = () => { if (T.goUntil) return; T.end += 15000; T.total += 15; tick(); };
-document.getElementById("tMinus").onclick = () => { if (T.goUntil) return; T.end -= 15000; tick(); };
+document.getElementById("tPlus").onclick = () => { if (T.goUntil) return; T.end += 15000; T.total += 15; tick(); restToSw(); };
+document.getElementById("tMinus").onclick = () => { if (T.goUntil) return; T.end -= 15000; tick(); restToSw(); };
 document.getElementById("tSkip").onclick = stopTimer;
 let actx = null;
 function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch (e) {} }
@@ -870,7 +880,7 @@ function beep() {
 }
 let lock = null;
 async function keepAwake() { try { if (!lock && navigator.wakeLock) { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; }); } } catch (e) {} }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (T.iv) tick(); if (DAYS.some(d => S.drafts[d] && hasDone(S.drafts[d]))) keepAwake(); } });
+document.addEventListener("visibilitychange", () => { swPost({ type: "visibility" }); if (document.visibilityState === "visible") { if (T.iv) tick(); if (DAYS.some(d => S.drafts[d] && hasDone(S.drafts[d]))) keepAwake(); } });
 
 // ---------- Boot ----------
 let savedTab = null; try { savedTab = sessionStorage.getItem("sp.tab"); } catch (e) {}
