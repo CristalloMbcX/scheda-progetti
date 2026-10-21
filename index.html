@@ -111,6 +111,9 @@ main .wrap { padding-block: 14px 140px; display: grid; gap: 12px; }
 .sh-item b { font-weight: 600; }
 .sh-item small { color: var(--muted); }
 .sh-item.cur { border-color: var(--accent); background: var(--accent-soft); }
+.set.warm .n { font-size: .95rem; color: var(--warn); }
+.set.warm:not(.done) .field input { border-style: dashed; }
+.warm-toggle { justify-self: start; border: 0; background: transparent; color: var(--accent); font-size: .85rem; font-weight: 600; padding: 4px 0; }
 .chip.rep { background: var(--accent-soft); color: var(--accent); }
 .tgt { font-family: var(--display); font-size: 1.05rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .last { margin: 0; font-size: .86rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
@@ -418,7 +421,14 @@ function defaultDay() {
   if (open) return open;
   return ({ 0: "lun", 1: "lun", 2: "mer", 3: "mer", 4: "ven", 5: "ven", 6: "lun" })[new Date().getDay()];
 }
-const hasDone = dr => Object.values(dr.entries || {}).some(e => e.sets.some(s => s.done));
+const hasDone = dr => Object.values(dr.entries || {}).some(e => e.sets.some(s => s.done) || (e.warm && e.warm.done));
+// Warm-up set: row key "w", kept apart from the working sets so it never affects progression.
+const setOf = (en, i) => i === "w" ? (en.warm = en.warm || {}) : en.sets[+i];
+function lastWarm(exId, alt) {
+  const key = keyOf(exId, alt);
+  for (const s of sortedSessions()) for (const [id, e] of Object.entries(s.entries)) if ((e.key || baseKey(id, e.alt)) === key && e.warm) return e.warm;
+  return null;
+}
 const sortedSessions = () => [...S.sessions].sort((a, b) => b.end - a.end);
 function lastEntry(exId, alt) {
   const key = keyOf(exId, alt);
@@ -578,6 +588,16 @@ function card(day, ex0, inSuperset) {
     h += `<p class="last"><span>Ultima (${dShort(last.end)}): ${last.e.sets.map(show).join(" · ")}</span>${chip}</p>`;
   }
   h += `<div class="sets">`;
+  const warmOn = !!(S.cfg[cfgId(ex0, alt)] && S.cfg[cfgId(ex0, alt)].warm) && ex.fields[0] === "kg";
+  if (warmOn) {
+    const w = (en && en.warm) || {}, lw = lastWarm(ex0.id, alt) || {};
+    h += `<div class="set warm${w.done ? " done" : ""}" data-i="w"><span class="n" title="Riscaldamento">R</span>`;
+    for (const f of ex.fields) {
+      const val = w[f] != null && w[f] !== "" ? w[f] : fmt(lw[f]);
+      h += `<label class="field"><input id="${day}-${ex0.id}-w-${f}" data-f="${f}" inputmode="decimal" autocomplete="off" value="${esc(val)}" placeholder="${f === "reps" ? "12" : ""}" aria-label="${UNITS[f]} riscaldamento"><span>${UNITS[f]}</span></label>`;
+    }
+    h += `<button class="tick" data-tick data-ss="0" aria-label="Riscaldamento fatto" aria-pressed="${!!w.done}"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`;
+  }
   for (let i = 0; i < ex.sets; i++) {
     const s = (en && en.sets[i]) || {};
     h += `<div class="set${s.done ? " done" : ""}${ex.fields.length === 1 ? " one" : ""}" data-i="${i}"><span class="n">${ex.sets > 1 ? i + 1 : ""}</span>`;
@@ -588,7 +608,9 @@ function card(day, ex0, inSuperset) {
     }
     h += `<button class="tick" data-tick data-ss="${inSuperset ? 1 : 0}" aria-label="Serie ${i + 1} fatta" aria-pressed="${!!s.done}"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`;
   }
-  return h + `</div></article>`;
+  h += `</div>`;
+  if (ex.fields[0] === "kg") h += `<button class="warm-toggle" data-warm-toggle>${warmOn ? "Togli riscaldamento" : "+ Serie di riscaldamento"}</button>`;
+  return h + `</article>`;
 }
 const f2 = ex => ex.fields[0] === "kg" ? " × " : " / ";
 
@@ -604,7 +626,7 @@ function renderHist() {
     for (const [id, e] of Object.entries(s.entries)) {
       const ex = exById(s.day, id) || { fields: e.fields || ["kg", "reps"] };
       const fields = e.fields || ex.fields;
-      h += `<div class="hrow"><span>${esc(e.name)}</span><span>${e.sets.map(x => fields.map(f => fmt(x[f]) + (f === "min" ? " min" : f === "lvl" ? " lvl" : "")).join(fields[0] === "kg" ? " × " : " / ")).join(" · ")}</span></div>`;
+      h += `<div class="hrow"><span>${esc(e.name)}</span><span>${e.warm ? "Risc. " + [e.warm.kg != null ? fmt(e.warm.kg) + " kg" : "", e.warm.reps != null ? fmt(e.warm.reps) + " rip" : ""].filter(Boolean).join(" × ") + (e.sets.length ? " · " : "") : ""}${e.sets.map(x => fields.map(f => fmt(x[f]) + (f === "min" ? " min" : f === "lvl" ? " lvl" : "")).join(fields[0] === "kg" ? " × " : " / ")).join(" · ")}</span></div>`;
     }
     h += `<button class="btn ghost danger" data-del="${s.id}">${S.confirmDel === s.id ? "Tocca di nuovo per eliminare" : "Elimina allenamento"}</button></div></details>`;
   }
@@ -640,9 +662,9 @@ viewEl.addEventListener("input", e => {
   const t = e.target, day = S.view;
   if (t.dataset.note) { draft(day).note = t.value; queueSave(day); return; }
   const f = t.dataset.f; if (!f) return;
-  const art = t.closest("[data-ex]"), i = +t.closest("[data-i]").dataset.i;
+  const art = t.closest("[data-ex]"), i = t.closest("[data-i]").dataset.i;
   const ex = exById(day, art.dataset.ex), en = entry(day, ex);
-  en.sets[i][f] = t.value;
+  setOf(en, i)[f] = t.value;
   queueSave(day);
 });
 viewEl.addEventListener("click", e => {
@@ -654,6 +676,14 @@ viewEl.addEventListener("click", e => {
   if (e.target.closest("[data-edit]")) { const id = e.target.closest("[data-ex]").dataset.ex; S.editing = S.editing === day + ":" + id ? null : day + ":" + id; return softRender(); }
   const infoB = e.target.closest("[data-info]"), pickB = e.target.closest("[data-pick]");
   if (infoB || pickB) { openSheet(infoB ? "info" : "pick", day, e.target.closest("[data-ex]").dataset.ex); return; }
+  if (e.target.closest("[data-warm-toggle]")) {
+    const ex0 = exById(day, e.target.closest("[data-ex]").dataset.ex);
+    const en = S.drafts[day] && S.drafts[day].entries[ex0.id], k = cfgId(ex0, !!(en && en.alt));
+    const c = { ...(S.cfg[k] || {}) };
+    if (c.warm) { delete c.warm; if (en) { delete en.warm; queueSave(day); } } else c.warm = true;
+    if (Object.keys(c).length) S.cfg[k] = c; else delete S.cfg[k];
+    store.saveCfg(); return softRender();
+  }
   if (e.target.closest("[data-cfg-cancel]")) { S.editing = null; return softRender(); }
   const cfgSave = e.target.closest("[data-cfg-save]"), cfgReset = e.target.closest("[data-cfg-reset]");
   if (cfgSave || cfgReset) {
@@ -699,15 +729,15 @@ viewEl.addEventListener("click", e => {
 });
 function onTick(day, btn) {
   unlockAudio(); keepAwake();
-  const art = btn.closest("[data-ex]"), row = btn.closest("[data-i]"), i = +row.dataset.i;
-  const ex0 = exById(day, art.dataset.ex), en = entry(day, ex0), ex = cur(ex0, en.alt), s = en.sets[i];
+  const art = btn.closest("[data-ex]"), row = btn.closest("[data-i]"), i = row.dataset.i;
+  const ex0 = exById(day, art.dataset.ex), en = entry(day, ex0), ex = cur(ex0, en.alt), s = setOf(en, i);
   const d = draft(day);
   if (s.done) { s.done = false; queueSave(day); return softRender(); }
   const tg = targets(ex);
   for (const f of ex.fields) {
     const inp = row.querySelector(`[data-f="${f}"]`);
     let v = num(inp.value);
-    if (v == null && f === "reps") v = tg[i];
+    if (v == null && f === "reps" && i !== "w") v = tg[+i];
     s[f] = v == null ? "" : fmt(v);
   }
   s.done = true;
@@ -717,7 +747,7 @@ function onTick(day, btn) {
   if (document.activeElement) document.activeElement.blur();
   pending = false;
   softRender();
-  if (btn.dataset.ss !== "1" && ex.rest) startTimer(ex.rest, ex.name);
+  if (btn.dataset.ss !== "1" && ex.rest) startTimer(ex.rest, i === "w" ? ex.name + " (dopo il riscaldamento)" : ex.name);
 }
 function finish(day) {
   const d = S.drafts[day]; if (!d || !hasDone(d)) return;
@@ -726,7 +756,9 @@ function finish(day) {
     const ex0 = exById(day, id); if (!ex0) continue;
     const ex = cur(ex0, en.alt);
     const sets = en.sets.filter(s => s.done).map(s => Object.fromEntries(ex.fields.map(f => [f, num(s[f])])));
-    if (sets.length) entries[id] = { name: ex.name, alt: !!en.alt, key: keyOf(id, en.alt), fields: ex.fields, sets };
+    const warm = en.warm && en.warm.done ? Object.fromEntries(ex.fields.map(f => [f, num(en.warm[f])])) : null;
+    if (warm && !sets.length) { entries[id] = { name: ex.name, alt: !!en.alt, key: keyOf(id, en.alt), fields: ex.fields, sets: [], warm }; continue; }
+    if (sets.length) entries[id] = { name: ex.name, alt: !!en.alt, key: keyOf(id, en.alt), fields: ex.fields, sets, ...(warm ? { warm } : {}) };
   }
   const end = Date.now();
   const s = { id: "s_" + end, day, start: d.start || end, end, note: d.note || "", entries };
