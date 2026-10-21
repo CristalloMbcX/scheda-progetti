@@ -89,6 +89,28 @@ main .wrap { padding-block: 14px 140px; display: grid; gap: 12px; }
 .editor input, .editor select { height: 42px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 0 10px; font-size: 1rem; color: var(--ink); }
 .ed-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn.small { height: 40px; font-size: 1rem; padding: 0 16px; flex: 1; }
+.edit.info { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 700; font-size: 1.05rem; color: var(--accent); border: 1.5px solid var(--accent); width: 26px; height: 26px; border-radius: 50%; margin: 0 2px 0 0; padding: 0; }
+.sheet-bg { position: fixed; inset: 0; z-index: 20; background: color-mix(in srgb, #000 45%, transparent); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); color: var(--ink); width: 100%; max-width: 560px; max-height: 88%; overflow-y: auto; border-radius: 18px 18px 0 0; box-sizing: border-box; padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 10px; align-content: start; }
+.sh-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.sh-head h2 { margin: 0; font-family: var(--display); font-size: 1.7rem; line-height: 1.05; text-transform: uppercase; text-wrap: balance; }
+.sh-x { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface-2); font-size: 1.4rem; line-height: 1; }
+.sheet h3 { margin: 6px 0 0; font-family: var(--display); text-transform: uppercase; letter-spacing: .08em; font-size: .95rem; color: var(--muted); }
+.sh-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.sh-tags span { background: var(--accent-soft); color: var(--accent); font-size: .8rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+.cues { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; line-height: 1.45; }
+.mistake { margin: 0; background: var(--warn-soft); color: var(--ink); border-radius: 10px; padding: 10px 12px; }
+.sh-empty, .sh-sub { margin: 0; color: var(--muted); }
+.linkbtn { display: grid; place-items: center; text-decoration: none; box-sizing: border-box; }
+.sh-search { height: 46px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); padding: 0 12px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+.sh-groups { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.sh-groups button { flex: none; border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 6px 12px; font-size: .85rem; }
+.sh-groups button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.sh-list { display: grid; gap: 6px; }
+.sh-item { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
+.sh-item b { font-weight: 600; }
+.sh-item small { color: var(--muted); }
+.sh-item.cur { border-color: var(--accent); background: var(--accent-soft); }
 .chip.rep { background: var(--accent-soft); color: var(--accent); }
 .tgt { font-family: var(--display); font-size: 1.05rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .last { margin: 0; font-size: .86rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
@@ -156,6 +178,7 @@ main .wrap { padding-block: 14px 140px; display: grid; gap: 12px; }
   </div>
 </header>
 <main><div class="wrap" id="view"></div></main>
+<div class="sheet-bg" id="sheet" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" id="sheet-box"></div></div>
 <div class="timer" id="timer" aria-live="polite">
   <div class="wrap">
     <div class="clock" id="clock">0:00</div>
@@ -170,6 +193,127 @@ main .wrap { padding-block: 14px 140px; display: grid; gap: 12px; }
 </div>
 
 <script>
+// ---------- Exercise library: [id, name, group, equipment, cues separated by |, main mistake] ----------
+const LIB_RAW = [
+  ["panca-piana-bil", "Panca piana con bilanciere", "Petto", "Bilanciere", "Scapole strette e basse, piedi ben piantati a terra|Scendi controllato fino a sfiorare il petto all'altezza dello sterno|Gomiti a circa 45° dal busto, non aperti a 90°|Spingi su e leggermente indietro, verso la linea degli occhi", "Rimbalzare il bilanciere sul petto o staccare i glutei dalla panca."],
+  ["panca-piana-man", "Panca piana con manubri", "Petto", "Manubri", "Porta i manubri all'altezza del petto con i gomiti a 45°|Spingi in alto facendoli avvicinare leggermente sopra il petto|Scendi lento finché senti allungare i pettorali|Tieni le scapole addotte per tutta la serie", "Far scontrare i manubri in alto e perdere tensione sul petto."],
+  ["panca-incl-bil", "Panca inclinata con bilanciere", "Petto", "Bilanciere", "Schienale a 30°, non di più|Il bilanciere scende sulla parte alta del petto, sotto le clavicole|Scapole indietro e petto in fuori|Spingi in verticale senza bloccare di colpo i gomiti", "Inclinazione troppo alta: il lavoro passa dal petto alle spalle."],
+  ["panca-incl-man", "Panca inclinata con manubri", "Petto", "Manubri", "Schienale a 30°, manubri ai lati della parte alta del petto|Gomiti leggermente sotto la linea delle spalle|Spingi in alto convergendo un po'|Scendi in 2-3 secondi per sentire l'allungamento", "Inarcare troppo la schiena trasformandola in una panca piana."],
+  ["panca-incl-multi", "Panca inclinata al multipower", "Petto", "Multipower", "Posiziona la panca a 30° in modo che la sbarra scenda sulla parte alta del petto|Sblocca ruotando i polsi e tieni le scapole strette|Scendi controllato fino a sfiorare il petto|Spingi senza staccare spalle e glutei dalla panca", "Panca nella posizione sbagliata: la sbarra scende sul collo o sullo sterno."],
+  ["panca-decl", "Panca declinata", "Petto", "Bilanciere", "Blocca bene le gambe nei rulli|Il bilanciere scende sulla parte bassa del petto|Gomiti a 45° dal busto|Spingi in linea retta", "Scendere troppo veloce senza controllo, rischioso a testa in giù."],
+  ["chest-press", "Chest press", "Petto", "Macchina", "Regola il sedile: impugnature a metà petto|Schiena e testa appoggiate, spalle basse|Spingi in avanti senza bloccare i gomiti|Ritorna lento fino a sentire allungare il petto", "Spalle che salgono verso le orecchie durante la spinta."],
+  ["chest-press-incl", "Chest press inclinata", "Petto", "Macchina", "Impugnature all'altezza della parte alta del petto|Scapole indietro e schiena appoggiata|Spingi in alto e in avanti|Controlla bene il ritorno", "Staccare la schiena dallo schienale per spingere più peso."],
+  ["pectoral-machine", "Pectoral machine (pec fly)", "Petto", "Macchina", "Regola il sedile: braccia all'altezza delle spalle|Gomiti leggermente flessi e fermi in quella posizione|Chiudi davanti stringendo il petto per 1 secondo|Riapri lento fino a sentire allungare, senza andare troppo dietro", "Usare lo slancio o piegare e stendere i gomiti come in una spinta."],
+  ["croci-man", "Croci con manubri", "Petto", "Manubri", "Sdraiato in panca, manubri sopra il petto con palmi uno verso l'altro|Apri ad arco con i gomiti leggermente piegati|Scendi finché senti un buon allungamento|Richiudi come per abbracciare un albero", "Scendere troppo con pesi pesanti, sovraccaricando la spalla."],
+  ["croci-cavi", "Croci ai cavi alti", "Petto", "Cavi", "Carrucole in alto, un passo avanti con busto leggermente inclinato|Gomiti morbidi e fermi|Porta le mani verso il basso e al centro, davanti al bacino|Torna lento sentendo l'allungamento", "Tirare con le braccia invece di chiudere con il petto."],
+  ["croci-cavi-basso", "Croci ai cavi dal basso", "Petto", "Cavi", "Carrucole in basso, busto dritto|Porta le mani in alto e al centro all'altezza del viso|Gomiti leggermente flessi|Lavora la parte alta del petto, scendi controllato", "Alzare le spalle insieme alle mani."],
+  ["dip-petto", "Dip alle parallele", "Petto", "Corpo libero", "Busto inclinato in avanti per coinvolgere il petto|Scendi finché le spalle sono all'altezza dei gomiti|Gomiti leggermente aperti|Spingi su senza bloccare di scatto", "Scendere troppo in basso con le spalle che vanno in avanti."],
+  ["piegamenti", "Piegamenti sulle braccia", "Petto", "Corpo libero", "Mani poco più larghe delle spalle|Corpo dritto dalla testa ai talloni, addome contratto|Scendi fino a sfiorare il pavimento col petto|Gomiti a 45°, non aperti a T", "Bacino che cade verso il basso o sedere alzato."],
+  ["pullover-man", "Pullover con manubrio", "Petto", "Manubri", "Sdraiato in panca, manubrio tenuto con due mani sopra il petto|Gomiti leggermente flessi e fermi|Porta il manubrio dietro la testa finché senti allungare|Riporta sopra il petto senza piegare le braccia", "Piegare e stendere i gomiti trasformandolo in un esercizio per tricipiti."],
+
+  ["lat-larga", "Lat machine presa larga", "Dorso", "Macchina", "Presa prona più larga delle spalle, cosce bloccate|Busto leggermente inclinato indietro|Tira la barra verso la parte alta del petto portando i gomiti in basso|Risali lento fino ad allungare bene le braccia", "Tirare dietro la nuca o oscillare il busto per aiutarsi."],
+  ["lat-prona", "Lat machine presa prona", "Dorso", "Macchina", "Presa prona poco più larga delle spalle|Petto in fuori e scapole che scendono prima di tirare|Porta la barra al petto pensando a spingere i gomiti verso i fianchi|Risali controllato", "Tirare con i bicipiti senza sentire il dorso."],
+  ["lat-inversa", "Lat machine presa inversa", "Dorso", "Macchina", "Presa supina larghezza spalle|Busto leggermente indietro, petto alto|Tira la barra verso il petto con i gomiti vicini al corpo|Risali lento allungando i dorsali", "Usare troppo i bicipiti e accorciare il movimento."],
+  ["lat-triangolo", "Lat machine con triangolo", "Dorso", "Macchina", "Impugna il triangolo, petto in fuori|Tira verso la parte alta del petto|Gomiti stretti e diretti verso il basso|Risali allungando completamente", "Inclinarsi troppo indietro trasformandola in un rematore."],
+  ["trazioni", "Trazioni alla sbarra", "Dorso", "Corpo libero", "Presa prona poco più larga delle spalle|Parti a braccia tese, scapole che scendono|Tira finché il mento supera la sbarra|Scendi controllato fino a braccia distese", "Fare mezze ripetizioni o dondolare con le gambe."],
+  ["trazioni-assistite", "Trazioni assistite", "Dorso", "Macchina", "Ginocchia sulla pedana, presa larga sopra le spalle|Più peso imposti, più la macchina ti aiuta|Tira portando il petto verso la sbarra|Scendi lento a braccia tese", "Scegliere troppa assistenza e non fare fatica."],
+  ["pulley", "Pulley con triangolo", "Dorso", "Cavi", "Piedi sulla pedana, ginocchia leggermente flesse|Schiena dritta, busto quasi verticale|Tira il triangolo verso l'ombelico stringendo le scapole|Ritorna allungando le braccia senza curvare la schiena", "Dondolare avanti e indietro con il busto per tirare."],
+  ["pulley-larga", "Pulley presa larga", "Dorso", "Cavi", "Barra dritta con presa larga|Busto fermo e schiena neutra|Tira verso la parte bassa del petto con i gomiti aperti|Stringi le scapole e torna lento", "Alzare le spalle verso le orecchie."],
+  ["rematore-bil", "Rematore con bilanciere", "Dorso", "Bilanciere", "Busto inclinato a 45° circa, schiena dritta|Ginocchia morbide, bilanciere sotto le spalle|Tira verso l'ombelico portando i gomiti indietro|Scendi controllato senza curvare la schiena", "Schiena curva o busto che si raddrizza a ogni ripetizione."],
+  ["rematore-man", "Rematore con manubrio", "Dorso", "Manubri", "Ginocchio e mano sulla panca, schiena piatta|Il manubrio pende sotto la spalla|Tira verso il fianco, non verso il petto|Scendi lento allungando il dorsale", "Ruotare il busto per tirare più peso."],
+  ["t-bar", "T-bar row", "Dorso", "Bilanciere", "Gambe divaricate sopra la barra, ginocchia flesse|Schiena dritta e busto inclinato|Tira l'impugnatura verso il petto|Scendi controllato", "Usare lo slancio delle gambe."],
+  ["low-row", "Rematore alla macchina (low row)", "Dorso", "Macchina", "Regola il sedile: impugnature all'altezza del petto basso|Petto contro il supporto|Tira portando i gomiti indietro e stringendo le scapole|Torna lento allungando", "Staccare il petto dal supporto per tirare."],
+  ["pulldown-tese", "Pulldown a braccia tese", "Dorso", "Cavi", "Davanti al cavo alto, busto leggermente inclinato|Braccia quasi tese, gomiti fermi|Porta la barra verso le cosce con i dorsali|Risali lento fino all'altezza della testa", "Piegare i gomiti trasformandolo in un pushdown."],
+  ["hyperextension", "Hyperextension", "Dorso", "Panca", "Bacino appoggiato al cuscinetto, piedi bloccati|Braccia incrociate al petto|Scendi a schiena dritta piegando le anche|Risali fino ad allineare il busto alle gambe, non oltre", "Inarcare troppo la schiena in alto."],
+  ["stacco-bil", "Stacco da terra", "Dorso", "Bilanciere", "Piedi larghezza anche, bilanciere sopra metà piede|Schiena dritta, petto alto, braccia tese|Spingi con le gambe tenendo il bilanciere vicino al corpo|In alto stendi le anche senza inarcarti", "Schiena curva durante la salita."],
+  ["stacco-rumeno-man", "Stacco rumeno con manubri", "Femorali e glutei", "Manubri", "In piedi, manubri davanti alle cosce, ginocchia leggermente flesse|Porta indietro il bacino tenendo la schiena dritta|Scendi lungo le gambe fino a sentire tirare i femorali|Risali spingendo il bacino in avanti", "Piegare troppo le ginocchia o curvare la schiena."],
+  ["stacco-rumeno-bil", "Stacco rumeno con bilanciere", "Femorali e glutei", "Bilanciere", "Bilanciere a contatto con le cosce|Bacino indietro, ginocchia quasi ferme|Scendi fino a metà tibia o finché la schiena resta dritta|Risali stringendo i glutei", "Allontanare il bilanciere dalle gambe."],
+  ["scrollate", "Scrollate", "Dorso", "Manubri", "In piedi con manubri ai lati|Alza le spalle verso le orecchie in verticale|Tieni 1 secondo in alto|Scendi lento", "Ruotare le spalle in cerchio."],
+
+  ["lento-man", "Lento con manubri", "Spalle", "Manubri", "Seduto, schienale quasi verticale|Manubri all'altezza delle orecchie, gomiti sotto i polsi|Spingi in alto senza far toccare i manubri|Scendi controllato fino all'altezza delle orecchie", "Inarcare la schiena per spingere più peso."],
+  ["lento-bil", "Lento avanti con bilanciere", "Spalle", "Bilanciere", "In piedi o seduto, bilanciere sulla parte alta del petto|Glutei e addome contratti|Spingi sopra la testa portando la testa leggermente avanti alla fine|Scendi controllato", "Spingere con le gambe o inarcare la schiena."],
+  ["shoulder-press", "Shoulder press", "Spalle", "Macchina", "Regola il sedile: impugnature all'altezza delle spalle|Schiena appoggiata|Spingi in alto senza bloccare i gomiti|Scendi lento", "Sedile troppo basso che stressa le spalle."],
+  ["arnold", "Arnold press", "Spalle", "Manubri", "Parti con i manubri davanti al viso, palmi verso di te|Spingendo in alto ruota i palmi in avanti|Arriva sopra la testa|Ritorna ruotando al contrario", "Andare troppo veloci perdendo il controllo della rotazione."],
+  ["alzate-lat-man", "Alzate laterali con manubri", "Spalle", "Manubri", "In piedi, gomiti leggermente flessi|Alza le braccia lateralmente fino all'altezza delle spalle|Guida il movimento con i gomiti, non con le mani|Scendi lento in 2-3 secondi", "Usare lo slancio del busto o alzare le spalle."],
+  ["alzate-lat-cavo", "Alzate laterali al cavo", "Spalle", "Cavi", "Cavo basso, impugnatura nella mano opposta alla carrucola|Busto fermo, leggermente lontano dalla macchina|Alza il braccio lateralmente fino all'altezza della spalla|Scendi lento mantenendo la tensione", "Lasciar tornare il cavo di colpo."],
+  ["alzate-lat-macchina", "Alzate laterali alla macchina", "Spalle", "Macchina", "Spalle allineate al perno della macchina|Gomiti contro i cuscinetti|Alza fino all'altezza delle spalle|Scendi lento", "Alzare le spalle verso le orecchie."],
+  ["alzate-front", "Alzate frontali", "Spalle", "Manubri", "In piedi, manubri davanti alle cosce|Alza un braccio o entrambi davanti fino all'altezza degli occhi|Gomiti leggermente flessi|Scendi controllato", "Dondolare con il busto."],
+  ["alzate-post", "Alzate posteriori a busto flesso", "Spalle", "Manubri", "Busto inclinato quasi parallelo al pavimento, schiena dritta|Manubri sotto il petto, gomiti morbidi|Apri le braccia lateralmente fino all'altezza delle spalle|Scendi lento", "Stringere le scapole: il lavoro va al deltoide posteriore, non al dorso."],
+  ["reverse-fly", "Pick back (reverse fly alla macchina)", "Spalle", "Macchina", "Seduto con il petto contro lo schienale|Impugnature all'altezza delle spalle, braccia quasi tese|Apri le braccia all'indietro fino in linea con il corpo|Torna lento", "Usare slancio e piegare i gomiti."],
+  ["face-pull", "Face pull", "Spalle", "Cavi", "Corda al cavo all'altezza del viso|Tira verso il viso aprendo la corda ai lati|Gomiti alti, all'altezza delle spalle|Torna lento", "Tirare verso il petto con i gomiti bassi."],
+  ["tirate-mento", "Tirate al mento", "Spalle", "Bilanciere", "Presa larghezza spalle o più larga|Tira il bilanciere lungo il corpo fino al petto|I gomiti guidano e restano sopra i polsi|Scendi controllato", "Presa troppo stretta e tirare troppo in alto, stressando le spalle."],
+
+  ["curl-bil", "Curl con bilanciere", "Bicipiti", "Bilanciere", "In piedi, presa supina larghezza spalle|Gomiti fermi ai fianchi|Porta il bilanciere verso le spalle|Scendi lento fino a braccia quasi tese", "Dondolare con la schiena per tirare su il peso."],
+  ["curl-ez", "Curl con bilanciere EZ", "Bicipiti", "Bilanciere", "Impugna le curve interne della barra EZ|Gomiti ai fianchi|Sali contraendo il bicipite|Scendi controllato", "Portare i gomiti in avanti alla fine del movimento."],
+  ["curl-man", "Curl con manubri", "Bicipiti", "Manubri", "In piedi o seduto, palmi in avanti|Gomiti fermi accanto al busto|Sali fino a contrarre il bicipite|Scendi in 2-3 secondi", "Usare lo slancio e accorciare la discesa."],
+  ["curl-alternato", "Curl alternato", "Bicipiti", "Manubri", "Parti con i palmi verso le cosce|Salendo ruota il palmo verso l'alto|Un braccio alla volta, busto fermo|Scendi lento prima di cambiare braccio", "Ruotare il busto per aiutarsi."],
+  ["hammer", "Hammer curl", "Bicipiti", "Manubri", "Palmi uno verso l'altro, come impugnando un martello|Gomiti fermi ai fianchi|Sali fino all'altezza delle spalle|Scendi lento", "Portare i gomiti in avanti."],
+  ["panca-scott", "Curl alla panca Scott", "Bicipiti", "Bilanciere", "Ascelle appoggiate al bordo della panca|Braccia ben appoggiate sul cuscino|Sali contraendo il bicipite|Scendi quasi fino a braccia tese, senza bloccare di colpo", "Staccare i gomiti dal cuscino o lasciarsi cadere in basso."],
+  ["curl-concentrato", "Curl concentrato", "Bicipiti", "Manubri", "Seduto, gomito appoggiato all'interno della coscia|Sali lento portando il manubrio alla spalla|Stringi 1 secondo in alto|Scendi controllato", "Muovere la spalla per aiutarsi."],
+  ["curl-cavo", "Curl ai cavi", "Bicipiti", "Cavi", "Cavo basso con barra o corda|Gomiti ai fianchi e fermi|Porta l'impugnatura verso le spalle|Scendi lento mantenendo la tensione", "Inclinarsi indietro per tirare."],
+  ["curl-incl", "Curl su panca inclinata", "Bicipiti", "Manubri", "Schienale a 45-60°, braccia che pendono|Gomiti fermi dietro la linea del busto|Sali senza portare i gomiti avanti|Scendi fino a braccia tese", "Peso troppo alto che obbliga a muovere le spalle."],
+  ["curl-macchina", "Curl alla macchina", "Bicipiti", "Macchina", "Regola il sedile: gomiti allineati al perno|Braccia appoggiate al cuscino|Sali contraendo|Scendi lento", "Sedile regolato male che sposta il gomito dal perno."],
+
+  ["pushdown", "Push down al cavo", "Tricipiti", "Cavi", "Davanti al cavo alto, barra impugnata|Gomiti attaccati ai fianchi e fermi|Spingi in basso fino a braccia tese|Risali fino a 90° senza muovere i gomiti", "Gomiti che si alzano e si allontanano dal corpo."],
+  ["pushdown-corda", "Push down con corda", "Tricipiti", "Cavi", "Corda al cavo alto, gomiti ai fianchi|Spingi in basso aprendo la corda alla fine|Stringi i tricipiti 1 secondo|Risali controllato", "Piegarsi in avanti e spingere con il peso del corpo."],
+  ["french-press", "French press", "Tricipiti", "Bilanciere", "Sdraiato in panca, bilanciere EZ sopra il petto|Gomiti fermi, puntati verso il soffitto|Scendi verso la fronte piegando solo i gomiti|Stendi le braccia senza muovere le spalle", "Gomiti che si aprono verso l'esterno."],
+  ["french-man", "French press con manubri", "Tricipiti", "Manubri", "Sdraiato, manubri sopra il petto con palmi uno verso l'altro|Gomiti fermi|Scendi ai lati della testa|Stendi le braccia", "Muovere le braccia dalla spalla."],
+  ["estensioni-sopra-testa", "Estensioni sopra la testa con manubrio", "Tricipiti", "Manubri", "Seduto, manubrio tenuto con due mani sopra la testa|Gomiti vicini alla testa e puntati in alto|Scendi dietro la testa|Stendi le braccia", "Gomiti che si allargano."],
+  ["estensioni-cavo", "Estensioni sopra la testa al cavo", "Tricipiti", "Cavi", "Spalle al cavo, corda dietro la testa|Busto inclinato in avanti, gomiti fermi vicino alla testa|Stendi le braccia in avanti|Torna lento allungando i tricipiti", "Muovere le spalle invece dei gomiti."],
+  ["kickback", "Kickback", "Tricipiti", "Manubri", "Busto inclinato, braccio parallelo al busto|Gomito fermo vicino al fianco|Stendi l'avambraccio indietro|Torna lento a 90°", "Dondolare il braccio."],
+  ["dip-panca", "Dip tra due panche", "Tricipiti", "Corpo libero", "Mani sulla panca dietro di te|Scendi piegando i gomiti all'indietro|Fermati a 90° di flessione|Spingi su", "Scendere troppo, stressando le spalle."],
+  ["dip-macchina", "Dip alla macchina", "Tricipiti", "Macchina", "Seduto, impugnature ai lati|Busto dritto|Spingi in basso fino a braccia tese|Risali controllato", "Alzare le spalle."],
+  ["panca-stretta", "Panca presa stretta", "Tricipiti", "Bilanciere", "Presa larghezza spalle|Gomiti vicini al corpo|Scendi verso la parte bassa del petto|Spingi su con i tricipiti", "Presa troppo stretta che stressa i polsi."],
+
+  ["squat-bil", "Squat con bilanciere", "Quadricipiti", "Bilanciere", "Bilanciere sui trapezi, piedi larghezza spalle|Petto alto e addome contratto|Scendi portando il bacino indietro e in basso, ginocchia in linea con le punte|Risali spingendo con tutto il piede", "Ginocchia che cadono verso l'interno."],
+  ["front-squat", "Front squat", "Quadricipiti", "Bilanciere", "Bilanciere sulle spalle davanti, gomiti alti|Busto verticale|Scendi controllato|Risali spingendo con i talloni", "Gomiti che si abbassano facendo scivolare il bilanciere."],
+  ["goblet", "Goblet squat", "Quadricipiti", "Manubri", "Manubrio tenuto al petto con due mani|Piedi poco più larghi delle spalle|Scendi tra le ginocchia tenendo il busto dritto|Risali", "Talloni che si staccano da terra."],
+  ["leg-press", "Leg press", "Quadricipiti", "Macchina", "Piedi a metà pedana, larghezza spalle|Schiena e bacino ben appoggiati|Scendi finché le ginocchia sono a circa 90°|Spingi senza bloccare le ginocchia in alto", "Scendere troppo staccando il bacino dallo schienale."],
+  ["hack-squat", "Hack squat", "Quadricipiti", "Macchina", "Schiena contro lo schienale, spalle sotto i cuscinetti|Piedi a metà pedana|Scendi controllato|Spingi senza bloccare le ginocchia", "Talloni che si sollevano."],
+  ["v-squat", "V-Squat", "Quadricipiti", "Macchina", "Spalle sotto i cuscinetti, schiena appoggiata|Piedi larghezza spalle a metà pedana|Scendi finché le cosce sono parallele|Risali spingendo con tutto il piede", "Ginocchia che cadono verso l'interno."],
+  ["affondi", "Affondi", "Quadricipiti", "Manubri", "Fai un passo avanti lungo|Scendi finché il ginocchio dietro quasi tocca terra|Busto dritto, ginocchio davanti sopra la caviglia|Spingi con il piede davanti per tornare", "Passo troppo corto con il ginocchio che va molto oltre la punta."],
+  ["affondi-camminata", "Affondi in camminata", "Quadricipiti", "Manubri", "Fai affondi alternati avanzando|Busto dritto|Ginocchio dietro quasi a terra|Spingi e porta avanti l'altra gamba", "Perdere l'equilibrio andando troppo veloci."],
+  ["bulgaro", "Squat bulgaro", "Quadricipiti", "Manubri", "Piede dietro appoggiato alla panca|Piede davanti abbastanza lontano|Scendi verticale fino a 90°|Risali spingendo con il tallone davanti", "Piede davanti troppo vicino alla panca."],
+  ["leg-extension", "Leg extension", "Quadricipiti", "Macchina", "Ginocchio allineato al perno della macchina|Rullo appena sopra le caviglie|Stendi le gambe e stringi 1 secondo|Scendi lento senza far sbattere i pesi", "Andare di slancio sollevando il bacino dal sedile."],
+  ["step-up", "Step up", "Quadricipiti", "Manubri", "Piede intero sulla panca|Spingi con la gamba sopra senza aiutarti con quella sotto|Arriva in piedi sulla panca|Scendi controllato", "Darsi la spinta con la gamba a terra."],
+
+  ["leg-curl", "Leg curl sdraiato", "Femorali e glutei", "Macchina", "Ginocchia appena oltre il bordo della panca|Rullo sopra i talloni|Porta i talloni verso i glutei|Scendi lento senza staccare il bacino", "Alzare il bacino per aiutarsi."],
+  ["leg-curl-seduto", "Leg curl seduto", "Femorali e glutei", "Macchina", "Ginocchio allineato al perno|Blocca le cosce con il cuscino|Piega le gambe verso il basso|Ritorna lento", "Rullo posizionato troppo in alto sul polpaccio."],
+  ["hip-thrust", "Hip thrust", "Femorali e glutei", "Bilanciere", "Schiena appoggiata alla panca all'altezza delle scapole|Bilanciere sulle anche con imbottitura|Spingi il bacino in alto stringendo i glutei|In alto il busto è parallelo al pavimento, poi scendi", "Inarcare la schiena invece di stendere le anche."],
+  ["glute-bridge", "Ponte per glutei", "Femorali e glutei", "Corpo libero", "Sdraiato, piedi a terra vicino ai glutei|Spingi il bacino in alto con i talloni|Stringi i glutei 1 secondo|Scendi lento", "Spingere con la punta dei piedi."],
+  ["abductor", "Abductor (macchina abduttori)", "Femorali e glutei", "Macchina", "Schiena appoggiata, cuscinetti all'esterno delle ginocchia|Apri le gambe in modo controllato|Tieni 1 secondo aperto|Richiudi lento", "Fare rimbalzare i pesi."],
+  ["adductor", "Adductor (macchina adduttori)", "Femorali e glutei", "Macchina", "Cuscinetti all'interno delle ginocchia|Chiudi le gambe controllando|Stringi 1 secondo|Riapri lento fino a sentire allungare", "Aprire troppo all'inizio con peso alto."],
+  ["good-morning", "Good morning", "Femorali e glutei", "Bilanciere", "Bilanciere sui trapezi, ginocchia morbide|Porta il bacino indietro con la schiena dritta|Scendi finché senti tirare i femorali|Risali stendendo le anche", "Curvare la schiena."],
+  ["kickback-glutei", "Slanci per glutei al cavo", "Femorali e glutei", "Cavi", "Cavigliera al cavo basso|Mani sulla macchina, busto leggermente inclinato|Porta la gamba indietro stringendo il gluteo|Torna lento", "Inarcare la schiena per alzare di più la gamba."],
+
+  ["calf-piedi", "Calf raise in piedi", "Polpacci", "Macchina", "Avampiede sul bordo, talloni liberi|Ginocchia quasi tese|Sali sulle punte il più possibile e tieni 1 secondo|Scendi lento fino ad allungare bene", "Movimento corto e veloce che rimbalza."],
+  ["calf-seduto", "Calf raise seduto", "Polpacci", "Macchina", "Seduto, cuscinetti sulle cosce vicino alle ginocchia|Avampiede sul bordo|Sali sulle punte|Scendi lento", "Rimbalzare in basso."],
+  ["calf-pressa", "Calf alla leg press", "Polpacci", "Macchina", "Solo l'avampiede sul bordo basso della pedana|Ginocchia quasi tese|Spingi con le punte|Torna lento allungando", "Piegare le ginocchia."],
+
+  ["crunch", "Crunch", "Addome", "Corpo libero", "Sdraiato, ginocchia piegate e piedi a terra|Mani dietro la testa senza tirare il collo|Solleva le spalle arrotolando la schiena|Scendi lento senza appoggiare del tutto la testa", "Tirare la testa con le mani."],
+  ["crunch-alti", "Crunch con gambe sollevate", "Addome", "Corpo libero", "Sdraiato sul tappetino, gambe sollevate con ginocchia a 90°|Solleva le spalle verso le ginocchia|Espira salendo|Scendi lento", "Usare lo slancio delle braccia."],
+  ["crunch-cavi", "Crunch ai cavi", "Addome", "Cavi", "In ginocchio davanti al cavo alto, corda ai lati della testa|Fianchi fermi|Arrotola il busto portando i gomiti verso le cosce|Risali lento", "Sedersi sui talloni invece di flettere l'addome."],
+  ["crunch-inverso", "Crunch inverso", "Addome", "Corpo libero", "Sdraiato, gambe piegate in alto|Porta le ginocchia verso il petto sollevando il bacino|Scendi controllato|Mani a terra solo come appoggio", "Dondolare con le gambe."],
+  ["crunch-macchina", "Crunch alla macchina", "Addome", "Macchina", "Regola il sedile e impugna le maniglie|Arrotola il busto in avanti|Stringi l'addome 1 secondo|Ritorna lento", "Spingere con le braccia."],
+  ["plank", "Plank", "Addome", "Corpo libero", "Avambracci a terra sotto le spalle|Corpo dritto dalla testa ai talloni|Addome e glutei contratti|Respira normalmente", "Bacino che scende o sedere alzato."],
+  ["plank-laterale", "Plank laterale", "Addome", "Corpo libero", "Su un avambraccio, gomito sotto la spalla|Corpo in linea retta|Bacino alto|Tieni la posizione", "Lasciar cadere il bacino."],
+  ["leg-raise", "Leg raise alla sbarra", "Addome", "Corpo libero", "Appeso alla sbarra o alla sedia romana|Alza le ginocchia o le gambe verso il petto|Arrotola il bacino in alto|Scendi lento senza dondolare", "Oscillare con il corpo."],
+  ["leg-raise-terra", "Sollevamento gambe a terra", "Addome", "Corpo libero", "Sdraiato, mani sotto i glutei|Gambe tese o leggermente piegate|Alza fino a 90°|Scendi lento senza inarcare la schiena", "Lombari che si staccano da terra."],
+  ["russian-twist", "Russian twist", "Addome", "Corpo libero", "Seduto, busto inclinato indietro|Piedi sollevati o a terra|Ruota il busto da un lato all'altro|Movimento controllato", "Muovere solo le braccia."],
+  ["ab-wheel", "Ruota per addominali", "Addome", "Attrezzo", "In ginocchio con la ruota davanti|Rotola in avanti tenendo l'addome contratto|Vai avanti finché tieni la schiena dritta|Torna indietro", "Inarcare la schiena in fondo."],
+  ["mountain-climber", "Mountain climber", "Addome", "Corpo libero", "Posizione di piegamento|Porta le ginocchia al petto alternando|Bacino basso e fermo|Ritmo costante", "Alzare troppo il sedere."],
+
+  ["tapis", "Tapis roulant", "Cardio", "Macchina", "Riscaldati 2-3 minuti piano|Postura dritta, non aggrapparti ai manubri|Puoi aumentare la pendenza invece della velocità|Defaticamento lento alla fine", "Tenersi ai manubri, che riduce il lavoro."],
+  ["cyclette", "Cyclette", "Cardio", "Macchina", "Sellino all'altezza del bacino da in piedi|Gamba quasi tesa in basso|Schiena dritta|Mantieni un ritmo costante", "Sellino troppo basso che affatica le ginocchia."],
+  ["ellittica", "Ellittica", "Cardio", "Macchina", "Piedi ben appoggiati sui pedali|Spingi e tira con le braccia|Busto dritto|Ritmo costante", "Appoggiarsi troppo sulle braccia."],
+  ["vogatore", "Vogatore", "Cardio", "Macchina", "Spingi prima con le gambe|Poi inclina leggermente il busto indietro|Infine tira la maniglia al petto|Ritorna al contrario: braccia, busto, gambe", "Tirare con le braccia prima di spingere con le gambe."],
+  ["stair", "Stair climber", "Cardio", "Macchina", "Busto dritto|Appoggia tutto il piede su ogni gradino|Mani leggere sui corrimano|Ritmo costante", "Appoggiarsi pesantemente ai corrimano."],
+  ["corda", "Salto della corda", "Cardio", "Attrezzo", "Salti piccoli sulle punte|Polsi che girano la corda, gomiti vicini|Ritmo regolare|Atterra morbido", "Saltare troppo in alto."]
+];
+const LIB = LIB_RAW.map(([id, n, g, a, c, x]) => ({ id, n, g, a, c: c.split("|"), x }));
+const LIBMAP = Object.fromEntries(LIB.map(e => [e.id, e]));
+const GROUPS = [...new Set(LIB.map(e => e.g))];
+
 // ---------- Plan ----------
 const E = (id, name, w, reps, sets, rest, extra = {}) => ({ id, name, w, reps, sets, rest, fields: ["kg", "reps"], ...extra });
 const FINALE = [
@@ -199,7 +343,7 @@ const PLAN = {
     E("mer-pick-back", "Pick back", 40, "7", 2, 120),
     E("mer-scott", "Panca Scott", 14, "8", 2, 120),
     E("mer-distensioni", "Distensioni", 35, "10", 2, 120),
-    E("mer-leg-press", "Leg press", 70, "10", 3, 120, { alt: { name: "V-Squat", w: 45, key: "vsquat" } })
+    E("mer-leg-press", "Leg press", 70, "10", 3, 120, { alt: { name: "V-Squat", w: 45, key: "vsquat", lib: "v-squat" } })
   ]},
   ven: { name: "Venerdì", blocks: [
     E("ven-curl-grigio", "Curl (grigio)", 11.25, "8/7", 2, 150),
@@ -220,9 +364,22 @@ const DAYS = ["lun", "mer", "ven"];
 const UNITS = { kg: "kg", reps: "rip", min: "min", lvl: "lvl" };
 const allEx = day => PLAN[day].blocks.flatMap(b => b.superset ? b.items : [b]).concat(FINALE);
 const exById = (day, id) => allEx(day).find(e => e.id === id);
+// Library entry behind each plan exercise (shown by the info button).
+const LIBOF = {
+  "lun-panca-multi": "panca-incl-multi", "lun-pectfly": "pectoral-machine", "lun-lat-prona": "lat-prona", "lun-pulley": "pulley",
+  "lun-alzate": "alzate-lat-cavo", "lun-cavi-tri": "pushdown", "lun-cavi-bi": "curl-cavo", "lun-leg-ext": "leg-extension", "lun-leg-curl": "leg-curl",
+  "mer-lat-larga": "lat-larga", "mer-panca-piana": "panca-piana-bil", "mer-pectfly": "pectoral-machine", "mer-pick-back": "reverse-fly",
+  "mer-scott": "panca-scott", "mer-leg-press": "leg-press",
+  "ven-curl-grigio": "curl-man", "ven-curl-bianco": "curl-man", "ven-french": "french-press", "ven-hammer": "hammer", "ven-pushdown": "pushdown",
+  "ven-panca-incl": "panca-incl-man", "ven-lat-inversa": "lat-inversa", "ven-lento": "lento-man", "ven-stacchi": "stacco-rumeno-man", "ven-leg-curl": "leg-curl",
+  "fin-crunch-cavi": "crunch-cavi", "fin-crunch-alti": "crunch-alti"
+};
+const defaultLib = (ex, alt) => alt && ex.alt ? ex.alt.lib : LIBOF[ex.id];
 const ALL = [...new Map(DAYS.flatMap(allEx).map(e => [e.id, e])).values()];
 // Same key = same exercise on different days: they share last weight and progression.
-const keyOf = (id, alt) => { const ex = ALL.find(e => e.id === id); if (!ex) return id; return alt && ex.alt ? ex.alt.key : (ex.key || ex.id); };
+const baseKey = (id, alt) => { const ex = ALL.find(e => e.id === id); if (!ex) return id; return alt && ex.alt ? ex.alt.key : (ex.key || ex.id); };
+// An exercise swapped for one from the library gets that exercise's history instead.
+const keyOf = (id, alt) => { const c = S.cfg[alt ? id + "~alt" : id]; return c && c.lib ? "lib:" + c.lib : baseKey(id, alt); };
 const MAX_REPS = 10;
 // Progression: under 10 reps add one rep; at 10 reps add 1 kg and restart from 6 reps.
 function suggest(ex, prev, target) {
@@ -266,7 +423,7 @@ const sortedSessions = () => [...S.sessions].sort((a, b) => b.end - a.end);
 function lastEntry(exId, alt) {
   const key = keyOf(exId, alt);
   for (const s of sortedSessions()) {
-    for (const [id, e] of Object.entries(s.entries)) if (keyOf(id, e.alt) === key && e.sets.length) return { e, end: s.end };
+    for (const [id, e] of Object.entries(s.entries)) if ((e.key || baseKey(id, e.alt)) === key && e.sets.length) return { e, end: s.end };
   }
   return null;
 }
@@ -283,7 +440,12 @@ const cfgId = (ex, alt) => alt && ex.alt ? ex.id + "~alt" : ex.id;
 function cur(ex, alt) {
   const base = alt && ex.alt ? { ...ex, name: ex.alt.name, w: ex.alt.w } : { ...ex };
   const c = S.cfg[cfgId(ex, alt)];
-  if (c) { if (c.name) base.name = c.name; if (c.rest != null) base.rest = c.rest; }
+  base.lib = defaultLib(ex, alt);
+  if (c) {
+    if (c.lib) { base.lib = c.lib; base.w = c.w != null ? c.w : null; base.name = LIBMAP[c.lib] ? LIBMAP[c.lib].n : base.name; }
+    if (c.name) base.name = c.name;
+    if (c.rest != null) base.rest = c.rest;
+  }
   return base;
 }
 
@@ -399,10 +561,11 @@ function card(day, ex0, inSuperset) {
   const doneAll = en && en.sets.every(s => s.done);
   const editing = S.editing === day + ":" + ex0.id;
   const tgt = ex.fields[0] === "min" ? `${ex.defaults.min} min · lvl ${ex.defaults.lvl}` : `${ex.sets} × ${ex.reps || "—"}${ex.rest ? " · " + fmtRest(ex.rest) : ""}`;
-  let h = `<article class="ex${doneAll ? " complete" : ""}" data-ex="${ex0.id}"><div class="ex-h"><h3>${esc(ex.name)}</h3><span class="tgt">${tgt}</span><button class="edit" data-edit aria-label="Modifica ${esc(ex.name)}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button></div>`;
+  let h = `<article class="ex${doneAll ? " complete" : ""}" data-ex="${ex0.id}"><div class="ex-h"><h3>${esc(ex.name)}</h3><span class="tgt">${tgt}</span><button class="edit info" data-info aria-label="Come si esegue ${esc(ex.name)}">i</button><button class="edit" data-edit aria-label="Modifica ${esc(ex.name)}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button></div>`;
   if (editing) {
     const restOpts = ex.fields[0] === "min" ? "" : `<label>Recupero<select id="rest-${day}-${ex0.id}" data-cfg-rest>${REST_OPTS.map(o => `<option value="${o}"${o === ex.rest ? " selected" : ""}>${fmtRest(o)}</option>`).join("")}${REST_OPTS.includes(ex.rest) ? "" : `<option value="${ex.rest}" selected>${fmtRest(ex.rest)}</option>`}</select></label>`;
     h += `<div class="editor"><label>Nome<input id="name-${day}-${ex0.id}" data-cfg-name value="${esc(ex.name)}" autocomplete="off"></label>${restOpts}
+      <button class="btn ghost small" data-pick>Cambia con un esercizio dalla lista</button>
       <div class="ed-btns"><button class="btn small" data-cfg-save>Salva</button><button class="btn ghost small" data-cfg-cancel>Annulla</button>${S.cfg[cfgId(ex0, alt)] ? `<button class="btn ghost small" data-cfg-reset>Originale</button>` : ""}</div></div>`;
   }
   if (ex0.alt) h += `<div class="alt"><button data-alt="0" aria-pressed="${!alt}">${esc(cur(ex0, false).name)}</button><button data-alt="1" aria-pressed="${alt}">${esc(cur(ex0, true).name)}</button></div>`;
@@ -489,6 +652,8 @@ viewEl.addEventListener("click", e => {
   const altB = e.target.closest("[data-alt]");
   if (altB) { const ex = exById(day, altB.closest("[data-ex]").dataset.ex); const en = entry(day, ex); en.alt = altB.dataset.alt === "1"; en.sets = en.sets.map(() => ({})); queueSave(day); return softRender(); }
   if (e.target.closest("[data-edit]")) { const id = e.target.closest("[data-ex]").dataset.ex; S.editing = S.editing === day + ":" + id ? null : day + ":" + id; return softRender(); }
+  const infoB = e.target.closest("[data-info]"), pickB = e.target.closest("[data-pick]");
+  if (infoB || pickB) { openSheet(infoB ? "info" : "pick", day, e.target.closest("[data-ex]").dataset.ex); return; }
   if (e.target.closest("[data-cfg-cancel]")) { S.editing = null; return softRender(); }
   const cfgSave = e.target.closest("[data-cfg-save]"), cfgReset = e.target.closest("[data-cfg-reset]");
   if (cfgSave || cfgReset) {
@@ -499,8 +664,9 @@ viewEl.addEventListener("click", e => {
       const orig = alt && ex0.alt ? { name: ex0.alt.name, rest: ex0.rest } : ex0;
       const name = art.querySelector("[data-cfg-name]").value.trim();
       const rs = art.querySelector("[data-cfg-rest]");
-      const c = {};
-      if (name && name !== orig.name) c.name = name;
+      const c = { ...(S.cfg[k] || {}) }; delete c.name; delete c.rest;
+      const libName = c.lib && LIBMAP[c.lib] ? LIBMAP[c.lib].n : null;
+      if (name && name !== (libName || orig.name)) c.name = name;
       if (rs && +rs.value !== orig.rest) c.rest = +rs.value;
       if (Object.keys(c).length) S.cfg[k] = c; else delete S.cfg[k];
     }
@@ -560,7 +726,7 @@ function finish(day) {
     const ex0 = exById(day, id); if (!ex0) continue;
     const ex = cur(ex0, en.alt);
     const sets = en.sets.filter(s => s.done).map(s => Object.fromEntries(ex.fields.map(f => [f, num(s[f])])));
-    if (sets.length) entries[id] = { name: ex.name, alt: !!en.alt, fields: ex.fields, sets };
+    if (sets.length) entries[id] = { name: ex.name, alt: !!en.alt, key: keyOf(id, en.alt), fields: ex.fields, sets };
   }
   const end = Date.now();
   const s = { id: "s_" + end, day, start: d.start || end, end, note: d.note || "", entries };
@@ -574,6 +740,63 @@ function finish(day) {
   render();
   window.scrollTo(0, document.body.scrollHeight);
 }
+
+// ---------- Info and library sheet ----------
+const sheetEl = document.getElementById("sheet"), sheetBox = document.getElementById("sheet-box");
+const SH = { mode: null, day: null, exId: null, q: "", g: "" };
+function sheetEx() { const ex0 = exById(SH.day, SH.exId); const en = S.drafts[SH.day] && S.drafts[SH.day].entries[SH.exId]; const alt = !!(en && en.alt); return { ex0, alt, ex: cur(ex0, alt) }; }
+function openSheet(mode, day, exId) {
+  SH.mode = mode; SH.day = day; SH.exId = exId; SH.q = ""; SH.g = "";
+  sheetEl.hidden = false; document.body.style.overflow = "hidden";
+  renderSheet();
+}
+function closeSheet() { sheetEl.hidden = true; document.body.style.overflow = ""; SH.mode = null; }
+function renderSheet() {
+  const { ex } = sheetEx();
+  if (SH.mode === "info") {
+    const L = ex.lib && LIBMAP[ex.lib];
+    const yt = "https://www.youtube.com/results?search_query=" + encodeURIComponent((L ? L.n : ex.name) + " esecuzione corretta");
+    sheetBox.innerHTML = `<div class="sh-head"><h2 id="sheet-title">${esc(ex.name)}</h2><button class="sh-x" data-close aria-label="Chiudi">×</button></div>` + (L ? `
+      <div class="sh-tags"><span>${esc(L.g)}</span><span>${esc(L.a)}</span>${L.n !== ex.name ? `<span>${esc(L.n)}</span>` : ""}</div>
+      <h3>Come si esegue</h3><ol class="cues">${L.c.map(c => `<li>${esc(c)}</li>`).join("")}</ol>
+      <h3>Errore da evitare</h3><p class="mistake">${esc(L.x)}</p>` : `<p class="sh-empty">Non ho una scheda per questo esercizio. Se lo trovi nella lista, sceglilo per vedere come si esegue.</p>`) + `
+      <div class="ed-btns"><a class="btn ghost small linkbtn" href="${yt}" target="_blank" rel="noopener">Guarda un video</a><button class="btn ghost small" data-sheet-pick>Cambia esercizio</button></div>`;
+  } else {
+    sheetBox.innerHTML = `<div class="sh-head"><h2 id="sheet-title">Scegli esercizio</h2><button class="sh-x" data-close aria-label="Chiudi">×</button></div>
+      <p class="sh-sub">Al posto di: ${esc(ex.name)}</p>
+      <input id="libq" class="sh-search" type="search" placeholder="Cerca, per esempio curl o panca" autocomplete="off" value="${esc(SH.q)}">
+      <div class="sh-groups">${["", ...GROUPS].map(g => `<button data-g="${esc(g)}" aria-pressed="${SH.g === g}">${g || "Tutti"}</button>`).join("")}</div>
+      <div class="sh-list" id="sh-list"></div>`;
+    renderList();
+  }
+}
+const norm = t => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function renderList() {
+  const q = norm(SH.q.trim());
+  const { ex } = sheetEx();
+  const items = LIB.filter(e => (!SH.g || e.g === SH.g) && (!q || norm(e.n + " " + e.g + " " + e.a).includes(q)));
+  document.getElementById("sh-list").innerHTML = items.length ? items.map(e => `<button class="sh-item${e.id === ex.lib ? " cur" : ""}" data-lib="${e.id}"><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.a)}${e.id === ex.lib ? " · attuale" : ""}</small></button>`).join("") : `<p class="sh-empty">Nessun esercizio trovato.</p>`;
+}
+function pickLib(id) {
+  const { ex0, alt } = sheetEx(), k = cfgId(ex0, alt);
+  const c = { ...(S.cfg[k] || {}) }; delete c.name; delete c.lib; delete c.w;
+  if (id !== defaultLib(ex0, alt)) c.lib = id;
+  if (Object.keys(c).length) S.cfg[k] = c; else delete S.cfg[k];
+  const en = S.drafts[SH.day] && S.drafts[SH.day].entries[ex0.id];
+  if (en) { en.sets = en.sets.map(() => ({})); queueSave(SH.day); }
+  store.saveCfg();
+  SH.mode = "info"; renderSheet(); S.editing = null; softRender();
+}
+sheetEl.addEventListener("click", e => {
+  if (e.target === sheetEl || e.target.closest("[data-close]")) return closeSheet();
+  if (e.target.closest("[data-sheet-pick]")) { SH.mode = "pick"; return renderSheet(); }
+  const g = e.target.closest("[data-g]");
+  if (g) { SH.g = g.dataset.g; sheetBox.querySelectorAll("[data-g]").forEach(b => b.setAttribute("aria-pressed", b.dataset.g === SH.g)); return renderList(); }
+  const it = e.target.closest("[data-lib]");
+  if (it) return pickLib(it.dataset.lib);
+});
+sheetEl.addEventListener("input", e => { if (e.target.id === "libq") { SH.q = e.target.value; renderList(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !sheetEl.hidden) closeSheet(); });
 
 // ---------- Rest timer ----------
 const T = { end: 0, total: 0, label: "", iv: null, goUntil: 0 };
