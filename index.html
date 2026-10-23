@@ -113,6 +113,24 @@ main .wrap { padding-block: 14px 140px; display: grid; gap: 12px; }
 .sh-item.cur { border-color: var(--accent); background: var(--accent-soft); }
 .set.warm .n { font-size: .95rem; color: var(--warn); }
 .set.warm:not(.done) .field input { border-style: dashed; }
+.dayhead .plan-btn { flex: none; height: 38px; padding: 0 14px; }
+.pe-hint { margin: 0; color: var(--muted); font-size: .9rem; }
+.pe-list { display: grid; gap: 6px; }
+.pe-row { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 12px; }
+.pe-name { flex: 1; min-width: 0; font-weight: 600; }
+.pe-tools { display: flex; gap: 2px; flex: none; }
+.pe-btn { width: 36px; height: 36px; border: 0; background: transparent; border-radius: 8px; display: grid; place-items: center; }
+.pe-btn svg { width: 19px; height: 19px; stroke: var(--ink); }
+.pe-btn.danger svg { stroke: var(--danger); }
+.pe-btn:disabled { opacity: .25; cursor: default; }
+.pe-confirm { height: 36px; border: 0; border-radius: 8px; background: var(--danger); color: var(--surface); font-weight: 600; padding: 0 12px; }
+.pe-ss { border: 2px dashed var(--accent); border-radius: 14px; padding: 6px; display: grid; gap: 6px; }
+.pe-ss-h { display: flex; justify-content: space-between; align-items: center; padding-left: 6px; font-family: var(--display); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+.pe-ss-f { display: flex; gap: 8px; align-items: center; }
+.pe-note { flex: 1; min-width: 0; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); padding: 0 10px; font-size: .9rem; }
+.pe-text { border: 0; background: transparent; color: var(--accent); font-weight: 600; padding: 0 8px; height: 36px; }
+.btn.pe-add { justify-self: start; flex: none; }
+.sh-item.free { border-style: dashed; border-color: var(--accent); }
 .ex-actions { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .warm-toggle { justify-self: start; border: 0; background: transparent; color: var(--accent); font-size: .85rem; font-weight: 600; padding: 4px 0; }
 .notif-ask { display: grid; gap: 8px; background: var(--accent-soft); border-radius: 14px; padding: 12px; }
@@ -447,8 +465,21 @@ const PLAN = {
 };
 const DAYS = ["lun", "mer", "ven"];
 const UNITS = { kg: "kg", reps: "rip", min: "min", lvl: "lvl" };
-const allEx = day => PLAN[day].blocks.flatMap(b => b.superset ? b.items : [b]).concat(FINALE);
-const exById = (day, id) => allEx(day).find(e => e.id === id);
+const BASE = new Map(DAYS.flatMap(d => PLAN[d].blocks.flatMap(b => b.superset ? b.items : [b])).concat(FINALE).map(e => [e.id, e]));
+// Exercise definition by id: the original plan, or one the user added (S.custom).
+function EXDEF(id) {
+  if (BASE.has(id)) return BASE.get(id);
+  const c = S.custom[id]; if (!c) return null;
+  return E(id, c.name || (c.lib && LIBMAP[c.lib] ? LIBMAP[c.lib].n : "Esercizio"), null, "10", 3, 120, { lib0: c.lib, key: c.lib ? "lib:" + c.lib : id });
+}
+// Day layout: main blocks and final exercises; a block is {id} or a superset {ss: [ids], note}.
+function defaultLayout(day) {
+  return { main: PLAN[day].blocks.map(b => b.superset ? { ss: b.items.map(e => e.id), note: b.note || "" } : { id: b.id }), fin: FINALE.map(e => ({ id: e.id })) };
+}
+const layoutOf = day => S.layout[day] || defaultLayout(day);
+const blockIds = b => b.ss ? b.ss : [b.id];
+const allEx = day => { const L = layoutOf(day); return L.main.concat(L.fin).flatMap(blockIds).map(EXDEF).filter(Boolean); };
+const exById = (day, id) => EXDEF(id);
 // Library entry behind each plan exercise (shown by the info button).
 const LIBOF = {
   "lun-panca-multi": "panca-incl-multi", "lun-pectfly": "pectoral-machine", "lun-lat-prona": "lat-prona", "lun-pulley": "pulley",
@@ -459,10 +490,9 @@ const LIBOF = {
   "ven-panca-incl": "panca-incl-man", "ven-lat-inversa": "lat-inversa", "ven-lento": "lento-man", "ven-stacchi": "stacco-rumeno-man", "ven-leg-curl": "leg-curl",
   "fin-crunch-cavi": "crunch-cavi", "fin-crunch-alti": "crunch-alti"
 };
-const defaultLib = (ex, alt) => alt && ex.alt ? ex.alt.lib : LIBOF[ex.id];
-const ALL = [...new Map(DAYS.flatMap(allEx).map(e => [e.id, e])).values()];
+const defaultLib = (ex, alt) => alt && ex.alt ? ex.alt.lib : (ex.lib0 || LIBOF[ex.id]);
 // Same key = same exercise on different days: they share last weight and progression.
-const baseKey = (id, alt) => { const ex = ALL.find(e => e.id === id); if (!ex) return id; return alt && ex.alt ? ex.alt.key : (ex.key || ex.id); };
+const baseKey = (id, alt) => { const ex = EXDEF(id); if (!ex) return id; return alt && ex.alt ? ex.alt.key : (ex.key || ex.id); };
 // An exercise swapped for one from the library gets that exercise's history instead.
 const keyOf = (id, alt) => { const c = S.cfg[alt ? id + "~alt" : id]; return c && c.lib ? "lib:" + c.lib : baseKey(id, alt); };
 const MAX_REPS = 10;
@@ -494,6 +524,9 @@ const S = {
   sessions: lsGet("sp.sessions") || [],
   drafts: lsGet("sp.drafts") || {},
   cfg: lsGet("sp.cfg") || {},
+  layout: lsGet("sp.layout") || {},
+  custom: lsGet("sp.custom") || {},
+  planEdit: null,
   editing: null,
   saved: null,
   confirmDel: null
@@ -538,6 +571,7 @@ function cur(ex, alt) {
     if (c.name) base.name = c.name;
     if (c.rest != null) base.rest = c.rest;
     if (c.sets) base.sets = c.sets;
+    if (c.reps) base.reps = c.reps;
   }
   return base;
 }
@@ -559,12 +593,12 @@ const store = {
       this.db = db; this.uid = id;
       let first = true;
       this.col().onSnapshot(snap => {
-        const sessions = [], drafts = {}; let cfg = null;
+        const sessions = [], drafts = {}; let cfg = null, layout = null, custom = null;
         snap.docs.forEach(d => {
           const v = d.data(); if (!v) return;
           if (d.id.startsWith("s_")) sessions.push({ ...v, id: d.id });
           else if (d.id.startsWith("cur_")) drafts[d.id.slice(4)] = JSON.parse(JSON.stringify(v));
-          else if (d.id === "cfg") cfg = JSON.parse(JSON.stringify(v.ex || {}));
+          else if (d.id === "cfg") { cfg = JSON.parse(JSON.stringify(v.ex || {})); layout = JSON.parse(JSON.stringify(v.layout || {})); custom = JSON.parse(JSON.stringify(v.custom || {})); }
         });
         if (first) {
           first = false;
@@ -573,15 +607,15 @@ const store = {
           // Move anything saved only on this phone up to the account.
           const known = new Set(sessions.map(s => s.id));
           S.sessions.filter(s => !known.has(s.id)).forEach(s => { this.saveSession(s); sessions.push(s); });
-          if (!cfg && Object.keys(S.cfg).length) this.saveCfg();
+          if (!cfg && (Object.keys(S.cfg).length || Object.keys(S.layout).length)) this.saveCfg();
           for (const d of DAYS) {
             if (drafts[d] && !(S.drafts[d] && hasDone(S.drafts[d]))) S.drafts[d] = drafts[d];
             else if (S.drafts[d] && hasDone(S.drafts[d]) && !drafts[d]) this.saveDraft(d);
           }
         }
         S.sessions = sessions;
-        if (cfg) S.cfg = cfg;
-        lsSet("sp.sessions", S.sessions); lsSet("sp.drafts", S.drafts); lsSet("sp.cfg", S.cfg);
+        if (cfg) { S.cfg = cfg; S.layout = layout; S.custom = custom; }
+        lsSet("sp.sessions", S.sessions); lsSet("sp.drafts", S.drafts); lsSet("sp.cfg", S.cfg); lsSet("sp.layout", S.layout); lsSet("sp.custom", S.custom);
         softRender();
       }, () => { this.db = null; setSync(); });
     } catch (e) { this.db = null; }
@@ -598,8 +632,8 @@ const store = {
     if (this.ready) { const { id, ...body } = s; this.col().doc(id).set(body).catch(() => {}); }
   },
   saveCfg() {
-    lsSet("sp.cfg", S.cfg);
-    if (this.ready) this.col().doc("cfg").set({ ex: JSON.parse(JSON.stringify(S.cfg)) }).catch(() => {});
+    lsSet("sp.cfg", S.cfg); lsSet("sp.layout", S.layout); lsSet("sp.custom", S.custom);
+    if (this.ready) this.col().doc("cfg").set(JSON.parse(JSON.stringify({ ex: S.cfg, layout: S.layout, custom: S.custom }))).catch(() => {});
   },
   deleteSession(id) {
     lsSet("sp.sessions", S.sessions);
@@ -631,22 +665,92 @@ function softRender() {
 document.addEventListener("focusout", () => setTimeout(() => { if (pending) { pending = false; softRender(); } }, 50));
 
 function renderDay(day) {
-  const p = PLAN[day], d = S.drafts[day];
+  if (S.planEdit === day) return renderPlanEdit(day);
+  const p = PLAN[day], d = S.drafts[day], L = layoutOf(day);
   const n = allEx(day).length;
   let h = STANDALONE && "Notification" in window && Notification.permission === "default" ? `<div class="notif-ask"><p>Attiva le notifiche per vedere il recupero nella barra in alto e sapere quando finisce, anche a schermo spento.</p><button class="btn small" data-notif>Attiva notifiche</button></div>` : "";
-  h += `<div class="dayhead"><div><h2>${p.name}</h2><p>${n} esercizi${d && d.start ? " · iniziato alle " + new Date(d.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : ""}</p></div></div>`;
-  for (const b of p.blocks) {
-    if (b.superset) {
-      h += `<div class="ss"><div class="ss-label"><span>${b.label}</span><span>${b.note ? esc(b.note) + " · " : ""}recupero dopo il secondo</span></div>${b.items.map((ex, i) => card(day, ex, i < b.items.length - 1)).join("")}</div>`;
-    } else h += card(day, b, false);
-  }
-  h += `<div class="section-label">Esercizi finali</div>` + FINALE.map(ex => card(day, ex, false)).join("");
+  h += `<div class="dayhead"><div><h2>${p.name}</h2><p>${n} esercizi${d && d.start ? " · iniziato alle " + new Date(d.start).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : ""}</p></div><button class="btn ghost small plan-btn" data-plan-edit>Modifica scheda</button></div>`;
+  const blocks = list => list.map(b => {
+    if (b.ss) {
+      const items = b.ss.map(EXDEF).filter(Boolean);
+      return `<div class="ss"><div class="ss-label"><span>Superserie</span><span>${b.note ? esc(b.note) + " · " : ""}recupero dopo l'ultimo</span></div>${items.map((ex, i) => card(day, ex, i < items.length - 1)).join("")}</div>`;
+    }
+    const ex = EXDEF(b.id); return ex ? card(day, ex, false) : "";
+  }).join("");
+  h += blocks(L.main);
+  if (L.fin.length) h += `<div class="section-label">Esercizi finali</div>` + blocks(L.fin);
+  if (!n) h += `<div class="empty">Nessun esercizio in questa scheda. Tocca “Modifica scheda” per aggiungerne.</div>`;
   const canSave = d && hasDone(d);
   h += `<div class="finish"><label for="note-${day}">Note sulla seduta</label><textarea id="note-${day}" data-note="${day}" placeholder="Come è andata, cosa aumentare la prossima volta">${esc(d ? d.note : "")}</textarea>
     ${S.saved === day ? `<p class="msg">Allenamento salvato nello storico.</p>` : ""}
     <button class="btn" data-finish="${day}" ${canSave ? "" : "disabled"}>Salva allenamento</button>
     ${canSave ? `<button class="btn ghost" data-discard="${day}">${S.confirmDel === "draft-" + day ? "Tocca di nuovo per azzerare" : "Azzera seduta"}</button>` : ""}</div>`;
   return h;
+}
+// ---------- Plan editor: add, delete, reorder exercises and build supersets ----------
+const ICON = {
+  up: '<path d="M12 19V5M5 12l7-7 7 7"/>', down: '<path d="M12 5v14M5 12l7 7 7-7"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  del: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'
+};
+const ib = (act, sec, bi, label, extra = "", j = "") => `<button class="pe-btn${act === "del" || act === "delitem" ? " danger" : ""}" data-pe="${act}" data-sec="${sec}" data-b="${bi}"${j !== "" ? ` data-j="${j}"` : ""} aria-label="${label}" title="${label}" ${extra}><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[act === "delitem" ? "del" : act]}</svg></button>`;
+function renderPlanEdit(day) {
+  const L = layoutOf(day);
+  const nm = id => { const ex = EXDEF(id); return ex ? esc(cur(ex, false).name) : "?"; };
+  const confirmTag = (sec, bi, j) => S.confirmDel === `pe-${sec}-${bi}-${j}`;
+  const section = (sec, list, label) => {
+    let h = `<div class="section-label">${label}</div><div class="pe-list">`;
+    list.forEach((b, bi) => {
+      const last = bi === list.length - 1;
+      const moves = ib("up", sec, bi, "Sposta su", bi === 0 ? "disabled" : "") + ib("down", sec, bi, "Sposta giù", last ? "disabled" : "");
+      const link = last ? "" : ib("link", sec, bi, "Unisci in superserie con il successivo");
+      if (b.ss) {
+        h += `<div class="pe-ss"><div class="pe-ss-h"><span>Superserie</span><div class="pe-tools">${moves}${link}</div></div>`;
+        b.ss.forEach((id, j) => {
+          h += `<div class="pe-row"><span class="pe-name">${nm(id)}</span>${confirmTag(sec, bi, j) ? `<button class="pe-confirm" data-pe="delitem" data-sec="${sec}" data-b="${bi}" data-j="${j}">Elimina</button>` : ib("delitem", sec, bi, "Elimina esercizio", "", j)}</div>`;
+        });
+        h += `<div class="pe-ss-f"><input class="pe-note" id="note-ss-${day}-${sec}-${bi}" data-ss-note data-sec="${sec}" data-b="${bi}" value="${esc(b.note || "")}" placeholder="Nota (facoltativa)"><button class="pe-text" data-pe="split" data-sec="${sec}" data-b="${bi}">Separa</button></div></div>`;
+      } else {
+        h += `<div class="pe-row single"><span class="pe-name">${nm(b.id)}</span><div class="pe-tools">${moves}${link}${confirmTag(sec, bi, 0) ? `<button class="pe-confirm" data-pe="del" data-sec="${sec}" data-b="${bi}">Elimina</button>` : ib("del", sec, bi, "Elimina esercizio")}</div></div>`;
+      }
+    });
+    if (!list.length) h += `<p class="sh-empty">Nessun esercizio.</p>`;
+    return h + `</div><button class="btn ghost small pe-add" data-pe="add" data-sec="${sec}">+ Aggiungi esercizio</button>`;
+  };
+  let h = `<div class="dayhead"><div><h2>${PLAN[day].name}</h2><p>Modifica scheda</p></div><button class="btn small plan-btn" data-plan-done>Fine</button></div>
+    <p class="pe-hint">Usa le frecce per cambiare l'ordine e la catena per unire un esercizio al successivo in una superserie. Le modifiche valgono per tutte le prossime sedute di ${PLAN[day].name}.</p>`;
+  h += section("main", L.main, "Esercizi") + section("fin", L.fin, "Esercizi finali");
+  if (S.layout[day]) h += `<button class="btn ghost danger" data-pe="reset" data-sec="main" data-b="0">${S.confirmDel === "pe-reset" ? "Tocca di nuovo per ripristinare" : "Ripristina la scheda originale"}</button>`;
+  return h;
+}
+function planAction(day, btn) {
+  const act = btn.dataset.pe, sec = btn.dataset.sec, bi = +btn.dataset.b, j = btn.dataset.j != null ? +btn.dataset.j : 0;
+  if (act === "add") { openSheet("add", day, null, sec); return; }
+  if (act === "reset") {
+    if (S.confirmDel !== "pe-reset") { S.confirmDel = "pe-reset"; return softRender(); }
+    delete S.layout[day]; S.confirmDel = null; store.saveCfg(); return softRender();
+  }
+  const L = JSON.parse(JSON.stringify(layoutOf(day))), list = L[sec], b = list[bi];
+  if (!b) return;
+  if (act === "del" || act === "delitem") {
+    const tag = `pe-${sec}-${bi}-${act === "del" ? 0 : j}`;
+    if (S.confirmDel !== tag) { S.confirmDel = tag; return softRender(); }
+    if (act === "del") list.splice(bi, 1);
+    else { b.ss.splice(j, 1); if (b.ss.length === 1) list[bi] = { id: b.ss[0] }; else if (!b.ss.length) list.splice(bi, 1); }
+  } else if (act === "up" && bi > 0) [list[bi - 1], list[bi]] = [list[bi], list[bi - 1]];
+  else if (act === "down" && bi < list.length - 1) [list[bi + 1], list[bi]] = [list[bi], list[bi + 1]];
+  else if (act === "link" && bi < list.length - 1) {
+    const nx = list[bi + 1];
+    list.splice(bi, 2, { ss: blockIds(b).concat(blockIds(nx)), note: b.note || nx.note || "" });
+  } else if (act === "split") list.splice(bi, 1, ...b.ss.map(id => ({ id })));
+  S.confirmDel = null; S.layout[day] = L; store.saveCfg(); softRender();
+}
+function addExercise(day, sec, lib, name) {
+  const id = "c" + Date.now().toString(36);
+  S.custom[id] = lib ? { lib } : { name };
+  const L = JSON.parse(JSON.stringify(layoutOf(day)));
+  L[sec].push({ id });
+  S.layout[day] = L; store.saveCfg();
 }
 function card(day, ex0, inSuperset) {
   const d = S.drafts[day], en = d && d.entries[ex0.id];
@@ -658,7 +762,7 @@ function card(day, ex0, inSuperset) {
   let h = `<article class="ex${doneAll ? " complete" : ""}" data-ex="${ex0.id}"><div class="ex-h"><h3>${esc(ex.name)}</h3><span class="tgt">${tgt}</span><button class="edit info" data-info aria-label="Come si esegue ${esc(ex.name)}">i</button><button class="edit" data-edit aria-label="Modifica ${esc(ex.name)}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button></div>`;
   if (editing) {
     const restOpts = ex.fields[0] === "min" ? "" : `<label>Recupero<select id="rest-${day}-${ex0.id}" data-cfg-rest>${REST_OPTS.map(o => `<option value="${o}"${o === ex.rest ? " selected" : ""}>${fmtRest(o)}</option>`).join("")}${REST_OPTS.includes(ex.rest) ? "" : `<option value="${ex.rest}" selected>${fmtRest(ex.rest)}</option>`}</select></label>`;
-    h += `<div class="editor"><label>Nome<input id="name-${day}-${ex0.id}" data-cfg-name value="${esc(ex.name)}" autocomplete="off"></label>${restOpts}
+    h += `<div class="editor"><label>Nome<input id="name-${day}-${ex0.id}" data-cfg-name value="${esc(ex.name)}" autocomplete="off"></label>${ex.fields.includes("reps") ? `<label>Ripetizioni obiettivo (per esempio 8 oppure 8/6)<input id="reps-${day}-${ex0.id}" data-cfg-reps value="${esc(ex.reps)}" inputmode="text" autocomplete="off"></label>` : ""}${restOpts}
       <button class="btn ghost small" data-pick>Cambia con un esercizio dalla lista</button>
       <div class="ed-btns"><button class="btn small" data-cfg-save>Salva</button><button class="btn ghost small" data-cfg-cancel>Annulla</button>${S.cfg[cfgId(ex0, alt)] ? `<button class="btn ghost small" data-cfg-reset>Originale</button>` : ""}</div></div>`;
   }
@@ -725,26 +829,30 @@ function backupBox() {
     <button class="btn ghost" data-backup-import>Importa backup</button>
     ${S.backupMsg ? `<p class="msg">${esc(S.backupMsg)}</p>` : ""}</div>`;
 }
-const backupText = () => JSON.stringify({ app: "scheda-palestra", v: 1, sessions: S.sessions, cfg: S.cfg });
+const backupText = () => JSON.stringify({ app: "scheda-palestra", v: 2, sessions: S.sessions, cfg: S.cfg, layout: S.layout, custom: S.custom });
 function importBackup(txt) {
   let d; try { d = JSON.parse(txt); } catch (e) { return "Il testo incollato non è un backup valido."; }
   if (!d || !Array.isArray(d.sessions)) return "Il testo incollato non è un backup valido.";
   const known = new Set(S.sessions.map(s => s.id)); let n = 0;
   for (const s of d.sessions) if (s && s.id && s.entries && !known.has(s.id)) { S.sessions.push(s); store.saveSession(s); n++; }
-  if (d.cfg && typeof d.cfg === "object") { S.cfg = { ...d.cfg, ...S.cfg }; store.saveCfg(); }
+  if (d.cfg && typeof d.cfg === "object") S.cfg = { ...d.cfg, ...S.cfg };
+  if (d.custom && typeof d.custom === "object") S.custom = { ...d.custom, ...S.custom };
+  if (d.layout && typeof d.layout === "object") S.layout = { ...d.layout, ...S.layout };
+  store.saveCfg();
   return `Importati ${n} allenament${n === 1 ? "o" : "i"}.`;
 }
 
 // ---------- Interactions ----------
 tabsEl.addEventListener("click", e => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
-  S.view = b.dataset.tab; S.saved = null; S.confirmDel = null; S.backupMsg = null;
+  S.view = b.dataset.tab; S.saved = null; S.confirmDel = null; S.backupMsg = null; S.planEdit = null;
   try { sessionStorage.setItem("sp.tab", S.view); } catch (err) {}
   render(); window.scrollTo(0, 0);
 });
 viewEl.addEventListener("input", e => {
   const t = e.target, day = S.view;
   if (t.dataset.note) { draft(day).note = t.value; queueSave(day); return; }
+  if (t.dataset.ssNote != null) { const L = JSON.parse(JSON.stringify(layoutOf(day))); const b = L[t.dataset.sec][+t.dataset.b]; if (b && b.ss) { b.note = t.value; S.layout[day] = L; clearTimeout(timers.cfg); timers.cfg = setTimeout(() => store.saveCfg(), 700); } return; }
   const f = t.dataset.f; if (!f) return;
   const art = t.closest("[data-ex]"), i = t.closest("[data-i]").dataset.i;
   const ex = exById(day, art.dataset.ex), en = entry(day, ex);
@@ -761,6 +869,10 @@ viewEl.addEventListener("click", e => {
   if (e.target.closest("[data-notif]")) { try { Notification.requestPermission().then(() => { softRender(); if (T.iv && !T.goUntil) restToSw(); }); } catch (err) {} return; }
   const infoB = e.target.closest("[data-info]"), pickB = e.target.closest("[data-pick]");
   if (infoB || pickB) { openSheet(infoB ? "info" : "pick", day, e.target.closest("[data-ex]").dataset.ex); return; }
+  if (e.target.closest("[data-plan-edit]")) { S.planEdit = day; S.confirmDel = null; S.editing = null; render(); window.scrollTo(0, 0); return; }
+  if (e.target.closest("[data-plan-done]")) { S.planEdit = null; S.confirmDel = null; render(); window.scrollTo(0, 0); return; }
+  const peB = e.target.closest("[data-pe]");
+  if (peB) return planAction(day, peB);
   const setsB = e.target.closest("[data-sets]");
   if (setsB) {
     const ex0 = exById(day, setsB.closest("[data-ex]").dataset.ex);
@@ -793,6 +905,8 @@ viewEl.addEventListener("click", e => {
       const libName = c.lib && LIBMAP[c.lib] ? LIBMAP[c.lib].n : null;
       if (name && name !== (libName || orig.name)) c.name = name;
       if (rs && +rs.value !== orig.rest) c.rest = +rs.value;
+      const rp = art.querySelector("[data-cfg-reps]"); delete c.reps;
+      if (rp) { const v = rp.value.replace(/\s/g, "").replace(/[^0-9/]/g, ""); if (v && /^\d+(\/\d+)*$/.test(v) && v !== (orig.reps || "")) c.reps = v; }
       if (Object.keys(c).length) S.cfg[k] = c; else delete S.cfg[k];
     }
     S.editing = null; store.saveCfg(); pending = false; document.activeElement && document.activeElement.blur(); return softRender();
@@ -871,9 +985,9 @@ function finish(day) {
 // ---------- Info and library sheet ----------
 const sheetEl = document.getElementById("sheet"), sheetBox = document.getElementById("sheet-box");
 const SH = { mode: null, day: null, exId: null, q: "", g: "" };
-function sheetEx() { const ex0 = exById(SH.day, SH.exId); const en = S.drafts[SH.day] && S.drafts[SH.day].entries[SH.exId]; const alt = !!(en && en.alt); return { ex0, alt, ex: cur(ex0, alt) }; }
-function openSheet(mode, day, exId) {
-  SH.mode = mode; SH.day = day; SH.exId = exId; SH.q = ""; SH.g = "";
+function sheetEx() { if (!SH.exId) return { ex0: null, alt: false, ex: { name: "", lib: null } }; const ex0 = exById(SH.day, SH.exId); const en = S.drafts[SH.day] && S.drafts[SH.day].entries[SH.exId]; const alt = !!(en && en.alt); return { ex0, alt, ex: cur(ex0, alt) }; }
+function openSheet(mode, day, exId, sec) {
+  SH.mode = mode; SH.day = day; SH.exId = exId; SH.sec = sec || null; SH.q = ""; SH.g = "";
   sheetEl.hidden = false; document.body.style.overflow = "hidden";
   renderSheet();
 }
@@ -889,8 +1003,8 @@ function renderSheet() {
       <h3>Errore da evitare</h3><p class="mistake">${esc(L.x)}</p>` : `<p class="sh-empty">Non ho una scheda per questo esercizio. Se lo trovi nella lista, sceglilo per vedere come si esegue.</p>`) + `
       <div class="ed-btns"><a class="btn ghost small linkbtn" href="${yt}" target="_blank" rel="noopener">Guarda un video</a><button class="btn ghost small" data-sheet-pick>Cambia esercizio</button></div>`;
   } else {
-    sheetBox.innerHTML = `<div class="sh-head"><h2 id="sheet-title">Scegli esercizio</h2><button class="sh-x" data-close aria-label="Chiudi">×</button></div>
-      <p class="sh-sub">Al posto di: ${esc(ex.name)}</p>
+    sheetBox.innerHTML = `<div class="sh-head"><h2 id="sheet-title">${SH.mode === "add" ? "Aggiungi esercizio" : "Scegli esercizio"}</h2><button class="sh-x" data-close aria-label="Chiudi">×</button></div>
+      <p class="sh-sub">${SH.mode === "add" ? (SH.sec === "fin" ? "Negli esercizi finali di " : "Nella scheda di ") + PLAN[SH.day].name : "Al posto di: " + esc(ex.name)}</p>
       <input id="libq" class="sh-search" type="search" placeholder="Cerca, per esempio curl o panca" autocomplete="off" value="${esc(SH.q)}">
       <div class="sh-groups">${["", ...GROUPS].map(g => `<button data-g="${esc(g)}" aria-pressed="${SH.g === g}">${g || "Tutti"}</button>`).join("")}</div>
       <div class="sh-list" id="sh-list"></div>`;
@@ -902,7 +1016,8 @@ function renderList() {
   const q = norm(SH.q.trim());
   const { ex } = sheetEx();
   const items = LIB.filter(e => (!SH.g || e.g === SH.g) && (!q || norm(e.n + " " + e.g + " " + e.a).includes(q)));
-  document.getElementById("sh-list").innerHTML = items.length ? items.map(e => `<button class="sh-item${e.id === ex.lib ? " cur" : ""}" data-lib="${e.id}"><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.a)}${e.id === ex.lib ? " · attuale" : ""}</small></button>`).join("") : `<p class="sh-empty">Nessun esercizio trovato.</p>`;
+  const free = SH.mode === "add" && SH.q.trim() ? `<button class="sh-item free" data-free><b>Aggiungi “${esc(SH.q.trim())}”</b><small>Nuovo esercizio con questo nome, senza scheda informativa</small></button>` : "";
+  document.getElementById("sh-list").innerHTML = free + (items.length ? items.map(e => `<button class="sh-item${e.id === ex.lib ? " cur" : ""}" data-lib="${e.id}"><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.a)}${e.id === ex.lib ? " · attuale" : ""}</small></button>`).join("") : `<p class="sh-empty">Nessun esercizio trovato.</p>`);
 }
 function pickLib(id) {
   const { ex0, alt } = sheetEx(), k = cfgId(ex0, alt);
@@ -920,6 +1035,8 @@ sheetEl.addEventListener("click", e => {
   const g = e.target.closest("[data-g]");
   if (g) { SH.g = g.dataset.g; sheetBox.querySelectorAll("[data-g]").forEach(b => b.setAttribute("aria-pressed", b.dataset.g === SH.g)); return renderList(); }
   const it = e.target.closest("[data-lib]");
+  if (it && SH.mode === "add") { addExercise(SH.day, SH.sec, it.dataset.lib); closeSheet(); return softRender(); }
+  if (e.target.closest("[data-free]")) { addExercise(SH.day, SH.sec, null, SH.q.trim()); closeSheet(); return softRender(); }
   if (it) return pickLib(it.dataset.lib);
 });
 sheetEl.addEventListener("input", e => { if (e.target.id === "libq") { SH.q = e.target.value; renderList(); } });
